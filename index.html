@@ -400,7 +400,7 @@ const trail = [];
 
 function mkP(L,team,homeSign,human,skill){
   return {L,name:L.name,team,homeSign,human,skill,speed:L.speed*(human?1:(0.86+0.18*skill)),power:L.power,control:L.control,reach:L.reach||1.2,
-    x:0,y:0,run:0,moving:false,swing:0,swingHigh:false,prep:0,prepKind:'A',lastD:99,icpt:null,hop:0,hopV:0,sulk:0};
+    x:0,y:0,run:0,moving:false,swing:0,swingHigh:false,prep:0,prepKind:'A',lastD:99,icpt:null,hop:0,hopV:0,sulk:0,vx:0,vy:0};
 }
 function oppLook(pair,i,sk){
   return {name:pair.names[i],shirt:pair.shirt,shorts:pair.shorts,skin:pair.skins[i],hair:pair.hairs[i],hs:pair.hs[i],band:pair.bands[i],racket:pair.racket,
@@ -474,7 +474,7 @@ function predict(tm){
   out.outBy = 0;
   for (let i=0;i<420;i++){
     ev.length=0; stepBall(b,STEP,ev); t+=STEP;
-    for (const e of ev){ const res=rule(r,e); if (res){ if (res.why==='out' && res.win===tm) out.outBy=res.margin; return out; } }
+    for (const e of ev){ if (e.t==='floor' && e.side===tm && !out.bounce) out.bounce={x:e.x,y:e.y}; const res=rule(r,e); if (res){ if (res.why==='out' && res.win===tm) out.outBy=res.margin; return out; } }
     if ((i&1) && canHitR(r,b,tm)) out.push({t,x:b.x,y:b.y,z:b.z,bounced:r.bounces>0});
   }
   return out;
@@ -485,7 +485,7 @@ function pickIcpt(p,list){
     if (c.z<0.2 || c.z>zMax(c.y)) continue;
     if (!c.bounced && Math.abs(c.y)>9) continue;
     const d = Math.max(0, Math.hypot(c.x-p.x, c.y-p.y) - p.reach*0.5);
-    const need = d/p.speed + 0.06, slack = c.t-need;
+    const need = d/p.speed + 0.12, slack = c.t-need;
     if (slack>=0){ const s = c.t + Math.abs(c.z-1.0)*0.4; if (s<bs){ bs=s; best=c; bestNeed=need; } }
     else if (-slack<fbs){ fbs=-slack; fb=c; }
   }
@@ -495,6 +495,7 @@ function pickIcpt(p,list){
 }
 function assign(tm){
   const list = predict(tm);
+  if (tm===0) incoming = list.bounce || null;
   // AI judges whether the ball is going out and leaves it
   if (letGo.for[tm]!==R){
     letGo.for[tm]=R; letGo.v[tm]=false;
@@ -514,6 +515,7 @@ function assign(tm){
   desig[tm] = bp;
 }
 const letGo = {for:[null,null], v:[false,false]};
+let incoming = null;
 function recovery(p){
   const s = p.team===0?-1:1, depth = form[p.team]==='net'?3.8:12.3;
   return {x: clamp(p.homeSign*2.6 + ball.x*0.25, -5.5, 5.5), y: s*depth};
@@ -522,12 +524,24 @@ function clampP(p){
   p.x = clamp(p.x,-9,9);
   p.y = p.team===0 ? clamp(p.y,-17.5,-0.45) : clamp(p.y,0.45,17.5);
 }
-function moveTo(p,tx,ty,mul,dt){
+const ACC = 42; // m/s^2: players speed up and slow down instead of snapping
+function seek(p,tx,ty,mul){
   const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy);
-  if (d>0.04){ const m=Math.min(d,p.speed*mul*dt); p.x+=dx/d*m; p.y+=dy/d*m; p.run+=m*4.2; p.moving=true; }
-  else p.moving=false;
-  clampP(p);
+  if (d<0.04) return {x:0,y:0};
+  const s=Math.min(p.speed*mul, Math.sqrt(2*ACC*d)*0.92);
+  return {x:dx/d*s, y:dy/d*s};
 }
+function accel(p,want,dt){
+  let ax=want.x-p.vx, ay=want.y-p.vy; const m=Math.hypot(ax,ay), lim=ACC*dt;
+  if (m>lim){ ax*=lim/m; ay*=lim/m; }
+  p.vx+=ax; p.vy+=ay;
+  const ox=p.x, oy=p.y;
+  p.x+=p.vx*dt; p.y+=p.vy*dt; clampP(p);
+  if (p.x!==ox+p.vx*dt) p.vx=0; if (p.y!==oy+p.vy*dt) p.vy=0;
+  const sp=Math.hypot(p.vx,p.vy); p.run+=sp*dt*4.2; p.moving=sp>0.3;
+}
+function moveTo(p,tx,ty,mul,dt){ accel(p,seek(p,tx,ty,mul),dt); }
+const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch(e){} };
 
 /* ---------- shots ---------- */
 function planShot(P,tx,ty,T,clear){
@@ -541,12 +555,11 @@ function planShot(P,tx,ty,T,clear){
   }
   return v;
 }
-function doHit(p,kind,power,aim,q){
-  const team=p.team, dir=team===0?1:-1;
-  const P={x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)};
+function humanSigma(p,q){ return 0.12 + q*q*0.8 + (1-p.control)*0.45; }
+function shotPlan(p,kind,power,aim,P,bounces){
   const high = P.z>1.75, nearNet = Math.abs(P.y)<6.5;
-  let type = kind==='A' ? (high?'smash':(R.bounces===0 && nearNet?'volley':'drive')) : (high?'bandeja':'lob');
-  let tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*4.3 : (-P.x*0.35 + rnd(-1.5,1.5)));
+  const type = kind==='A' ? (high?'smash':(bounces===0 && nearNet?'volley':'drive')) : (high?'bandeja':'lob');
+  const tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*4.3 : (-P.x*0.35 + (p.human?0:rnd(-1.5,1.5))));
   const ay = aim.y||0;
   let depth=9, speed=18, T=null, clear=0.25;
   const pw = 0.6+0.5*p.power;
@@ -557,7 +570,14 @@ function doHit(p,kind,power,aim,q){
     case 'bandeja':depth=9.5+ay*1.0; speed=15+5*power; clear=0.3; break;
     case 'smash':  depth=8.0+ay*1.5; speed=24+10*power*p.power; clear=0.05; break;
   }
-  const sigma = p.human ? (0.12 + q*q*0.8 + (1-p.control)*0.45) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4);
+  return {type,tx,depth,speed,T,clear,ay};
+}
+function doHit(p,kind,power,aim,q){
+  const team=p.team, dir=team===0?1:-1;
+  const P={x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)};
+  const high = P.z>1.75;
+  let {type,tx,depth,speed,T,clear,ay} = shotPlan(p,kind,power,aim,P,R.bounces);
+  const sigma = p.human ? humanSigma(p,q) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4);
   tx += gauss()*sigma; depth += gauss()*sigma*1.1;
   let netErr=false;
   if (!p.human){
@@ -578,7 +598,9 @@ function doHit(p,kind,power,aim,q){
   if (type==='drive' && Math.abs(P.y)>9) form[team]='back'; else form[team]='net';
   if (type==='lob' || type==='smash') form[1-team]='back';
   desig[team]=null; reactAt[1-team] = gameTime + (team===1 ? 0.1 : (0.45-0.3*teamOf(1)[0].skill) + rnd(0,0.18)*(1-teamOf(1)[0].skill)) + (type==='smash'?0.08:0);
-  assignT=0; p.swing=SW; p.swingHigh=high; p.prep=0;
+  assignT=0; p.swing=SW; p.swingHigh=high; p.prep=0; incoming=null;
+  for (const o of teamOf(1-team)) if (o.hop===0) o.hopV=1.3;
+  if (p.human) buzz(15);
   stats && (stats.rally++);
   sfx.hit(type==='smash'?1:power);
 }
@@ -601,7 +623,9 @@ function doServe(p,aim){
   const v=planShot(ball,tx,ty,T,0.06);
   ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz; ball.netted=false; ball.out=false; ball.slice=false;
   R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p};
-  state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null];
+  state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null]; incoming=null;
+  for (const o of teamOf(1-p.team)) if (o.hop===0) o.hopV=1.3;
+  if (p.human) buzz(20);
   reactAt[1-p.team] = gameTime + (p.team===1 ? 0.1 : 0.3-0.15*teamOf(1)[0].skill);
   assignT=0; deadT=0;
   if (stats) stats.rally=1;
@@ -623,7 +647,8 @@ function setupPoint(again){
   form[srv.team]='net'; form[1-srv.team]='back';
   for (const p of players){ p.prep=0; p.swing=0; p.icpt=null; p.moving=false; p.lastD=99; p.hop=0; p.hopV=0; }
   ball.netted=false; ball.out=false; ball.slice=false; ball.vx=ball.vy=ball.vz=0;
-  lee.sulk = 0;
+  lee.sulk = 0; incoming = null;
+  for (const p of players){ p.vx=0; p.vy=0; }
 }
 const WHY = {
   ace:['ACE!','Untouched serve'], winner:['WINNER!',''], net:['NET',''], out:['OUT','Long or wide'], back:['SPIN BACK!','It came back over the net'],
@@ -707,6 +732,13 @@ function shotPress(kind){
   if (screen!=='game' || paused || demo || !lee) return;
   initAudio();
   if (state==='serve' && serveInfo && serveInfo.srv===lee){ const a=axes(); doServe(lee,{x:sgn(a.x),y:sgn(a.y)}); return; }
+  // a press just after the ball reaches Lee still counts
+  if (canHit(0)){
+    const d=Math.hypot(ball.x-lee.x, ball.y-lee.y);
+    if (d<=lee.reach*1.35 && ball.z>=0.1 && ball.z<=zMax(lee.y)+0.2){
+      const a=axes(); doHit(lee,kind,0.35,{x:sgn(a.x),y:sgn(a.y)},Math.min(1,d/lee.reach+0.15)); lee.lastD=99; return;
+    }
+  }
   if (lee.prep<=0){ lee.prep=0.001; lee.prepKind=kind; } else lee.prepKind=kind;
 }
 document.addEventListener('keydown', e=>{
@@ -742,15 +774,22 @@ function updateTouch(){ document.body.classList.toggle('touch', touchSeen); $('#
 function updateHuman(dt){
   const p=lee; if (!p || !p.human) return;
   const a=axes(), mag=Math.hypot(a.x,a.y), manual=mag>0.25;
+  // Aim lock: once Lee is winding up and the ball is close, the keys only aim
+  // and Lee takes the last small steps to the ball himself.
+  const hs=Math.hypot(ball.vx,ball.vy), bd=Math.hypot(ball.x-p.x,ball.y-p.y);
+  p.locked = p.prep>0 && state==='rally' && R && R.hit!==0 && bd/Math.max(4,hs) < 0.6;
+  let want={x:0,y:0};
   if (state==='rally' || state==='over'){
-    if (manual && !(settings.assist && p.prep>0)){
-      const sp=p.speed*(p.prep>0?0.55:1)*Math.min(1,mag);
-      p.x+=a.x/mag*sp*dt; p.y+=a.y/mag*sp*dt; p.run+=sp*dt*4.2; p.moving=true; clampP(p);
+    if (p.locked){ const t=p.icpt; if (t && (settings.assist || Math.hypot(t.x-p.x,t.y-p.y)<2.5)) want=seek(p,t.x,t.y,1); }
+    else if (manual && !(settings.assist && p.prep>0)){
+      const sp=p.speed*(p.prep>0?0.8:1)*Math.min(1,mag);
+      want={x:a.x/mag*sp, y:a.y/mag*sp};
     } else if (settings.assist && state==='rally'){
       const tg=(desig[0]===p && p.icpt && R && R.hit!==0) ? p.icpt : recovery(p);
-      moveTo(p,tg.x,tg.y,1,dt);
-    } else p.moving=false;
-  } else p.moving=false;
+      want=seek(p,tg.x,tg.y,1);
+    }
+  }
+  if (state==='serve'){ p.vx=p.vy=0; p.moving=false; } else accel(p,want,dt);
   if (p.prep>0){ p.prep+=dt; if (p.prep>2.2){ p.prep=0; p.swing=SW; p.swingHigh=ball.z>1.75; } }
   if (p.prep>0 && canHit(0)){
     const d=Math.hypot(ball.x-p.x, ball.y-p.y);
@@ -896,6 +935,47 @@ function meshLines(c,pts,a){ // pts: generator of segments
   c.strokeStyle=`rgba(200,212,232,${a})`; c.lineWidth=0.7; c.beginPath();
   for (const [p,q] of pts){ const A=P3(...p), B=P3(...q); c.moveTo(A.x,A.y); c.lineTo(B.x,B.y); }
   c.stroke();
+}
+function groundRing(x,y,r,fill,stroke,lw){
+  const c=ctx; c.beginPath();
+  for (let i=0;i<=24;i++){ const a=i/24*Math.PI*2, q=P3(x+Math.cos(a)*r, y+Math.sin(a)*r, 0); i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y); }
+  c.closePath(); if (fill){ c.fillStyle=fill; c.fill(); } if (stroke){ c.strokeStyle=stroke; c.lineWidth=lw||2; c.stroke(); }
+}
+function drawGuides(){
+  if (demo || !lee || !lee.human || paused) return;
+  const c=ctx, t=performance.now()/1000;
+  // where the opponent's shot will bounce
+  if (state==='rally' && R && R.hit===1 && R.bounces===0 && incoming){
+    const pulse=0.32+0.06*Math.sin(t*9);
+    groundRing(incoming.x,incoming.y,pulse,'rgba(255,255,255,.12)','rgba(255,255,255,.75)',2);
+    groundRing(incoming.x,incoming.y,0.06,'rgba(255,255,255,.9)');
+  }
+  // where Lee's shot is heading
+  let tgt=null;
+  const a=axes(), aim={x:sgn(a.x),y:sgn(a.y)};
+  if (state==='serve' && serveInfo && serveInfo.srv===lee){
+    const box=serveInfo.box, tx=box*2.1+aim.x*1.6, depth=5.6+aim.y*0.5;
+    const inn = Math.abs(depth)<=SVC && tx*box>=0 && Math.abs(tx)<=HXS;
+    tgt={x:tx,y:-(lee.team===0?-1:1)*depth,r:0.35,ok:inn};
+  } else if (state==='rally' && R && R.hit!==0 && lee.prep>0){
+    const near=Math.hypot(ball.x-lee.x,ball.y-lee.y)<=lee.reach*1.5;
+    const ic=lee.icpt;
+    const P = near ? {x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)} : (ic ? {x:ic.x,y:ic.y,z:ic.z} : {x:lee.x,y:lee.y,z:1});
+    const bounces = near ? R.bounces : (ic && ic.bounced ? 1 : R.bounces);
+    const stiff = lee.prep>1.4 ? 0.35 : 0;
+    const pl = shotPlan(lee,lee.prepKind,clamp(lee.prep/0.8,0.3,1)-stiff*0.5,aim,P,bounces);
+    const tx=clamp(pl.tx,-7,7), ty=clamp(pl.depth,1.2,15);
+    const inn = Math.abs(tx)<=HX && ty<=HY;
+    tgt={x:tx,y:ty,r:Math.max(0.3,humanSigma(lee,0.35+stiff)*1.1),ok:inn};
+  }
+  if (tgt){
+    const col = tgt.ok ? '230,255,59' : '255,77,109';
+    const r=Math.max(0.55,tgt.r);
+    groundRing(tgt.x,tgt.y,r,`rgba(${col},.2)`,`rgba(${col},.95)`,3);
+    const q=P3(tgt.x,tgt.y,0), top=P3(tgt.x,tgt.y,1.1);
+    c.strokeStyle=`rgba(${col},.95)`; c.lineWidth=2; c.beginPath(); c.moveTo(q.x,q.y); c.lineTo(top.x,top.y); c.stroke();
+    c.fillStyle=`rgb(${col})`; c.beginPath(); c.moveTo(top.x,top.y-7); c.lineTo(top.x+5,top.y); c.lineTo(top.x,top.y+5); c.lineTo(top.x-5,top.y); c.closePath(); c.fill();
+  }
 }
 function drawNet(){
   const c=ctx;
@@ -1046,7 +1126,7 @@ function drawHUD(){
   // hints
   let hint='';
   if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = touchSeen ? 'Tap SHOT to serve · stick aims' : 'Press J or Space to serve · arrows aim';
-  else if (pointsPlayed<3 && (state==='rally')) hint = touchSeen ? 'Tap early: SHOT drives or smashes, LOB lobs' : 'Press early: J drives or smashes · K lobs · hold arrows to aim';
+  else if (pointsPlayed<3 && (state==='rally')) hint = touchSeen ? 'Tap early: SHOT drives or smashes, LOB lobs' : 'Press early: J drives or smashes · K lobs · arrows aim the target';
   if (hint){
     c.font='700 15px "Barlow Condensed",sans-serif'; c.textAlign='center';
     const tw=c.measureText(hint).width+28;
@@ -1088,6 +1168,7 @@ function render(dt){
   drawWorld();
   const objs = players.map(p=>({y:p.y,f:()=>drawPlayer(p)}));
   objs.push({y:0,f:drawNet});
+  drawGuides();
   if (match) objs.push({y:ball.y+0.01,f:drawBall});
   objs.sort((a,b)=>b.y-a.y);
   for (const o of objs) o.f();
