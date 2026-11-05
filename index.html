@@ -59,6 +59,15 @@ body{
   margin-block:-.4cqh .6cqh;text-shadow:0 .4cqh 0 #0a1029;z-index:1;animation:grump 2.6s ease-in-out infinite}
 @keyframes grump{0%,86%,100%{transform:rotate(-5deg)}89%{transform:rotate(-8deg) translateX(-.6cqw)}92%{transform:rotate(-2deg) translateX(.6cqw)}95%{transform:rotate(-7deg)}}
 @media (prefers-reduced-motion:reduce){.logo .hates{animation:none}}
+.secret{position:absolute;right:max(2cqw,10px);bottom:max(2cqh,10px);display:flex;align-items:center;gap:.5em;padding:6px;border:0;border-radius:999px;
+  background:transparent;cursor:pointer;opacity:.22;transition:opacity .2s}
+.secret::before{content:"";width:12px;height:12px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 30% 30%,#f6ff9a,var(--ball) 55%,#b9cc1f);box-shadow:inset 3px 0 0 -2px rgba(255,255,255,.7)}
+.secret:hover,.secret:focus-visible{opacity:.8}
+.secret .secret-label{display:none;font:700 clamp(10px,2.4cqh,13px)/1 var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ball)}
+.secret[aria-pressed="true"]{opacity:.9}
+.secret[aria-pressed="true"] .secret-label{display:inline}
+.logo .hates.loves-t{font-family:var(--f-script);font-size:min(10cqh,13cqw);letter-spacing:0;text-transform:none;animation:none;transform:rotate(-7deg);margin-block:-1.6cqh -.4cqh}
 .logo .loves{font-family:var(--f-script);font-size:min(10cqh,13cqw);color:var(--coral);transform:rotate(-7deg);
   margin-block:-2.2cqh -1.2cqh;text-shadow:0 .4cqh 0 rgba(0,0,0,.4);z-index:1}
 .tag{margin:0;font-size:clamp(12px,3.3cqh,20px);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
@@ -156,7 +165,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
 
   <section id="scrTitle" class="overlay">
     <div class="logo" aria-label="Lee HATES tennis"><span class="big">LEE</span><span class="hates">HATES</span><span class="big">TENNIS</span></div>
-    <p class="tag">Two-on-two tennis. Lee would rather be playing padel.</p>
+    <p class="tag" id="tagLine">Two-on-two tennis. Lee would rather be playing padel.</p>
     <div class="menu">
       <button class="btn primary" id="goTour">World Tour</button>
       <button class="btn" id="goQuick">Quick Match</button>
@@ -168,6 +177,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
       <button class="chip" id="tgSound" aria-pressed="true">Sound</button>
     </div>
     <p class="best" id="bestLine"></p>
+    <button id="tgFan" class="secret" aria-pressed="false" aria-label="Carlos Alcatraz mode" title="Carlos Alcatraz mode"><span class="secret-label">Carlos Alcatraz mode</span></button>
   </section>
 
   <section id="scrPartner" class="overlay solid" hidden>
@@ -230,7 +240,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
         <p><b>Keep it in.</b> Your shot must land inside the lines. This is doubles, so the outer tramlines count, except on the serve.</p>
         <p><b>One bounce.</b> Play the ball before it bounces twice, or volley it before it bounces (not on the return of serve).</p>
         <p><b>Leave it.</b> If a ball is flying long or wide, don't touch it. It's your point.</p>
-        <p><b>No walls.</b> Lee has noticed, and he has opinions.</p>
+        <p id="helpWalls"><b>No walls.</b> Lee has noticed, and he has opinions.</p>
         <p><b>No-ad scoring:</b> off by default. Switch it on to play deuce as a single deciding point.</p>
       </div>
     </div>
@@ -336,6 +346,13 @@ const GRUMBLE = {
   won:["Still hate it.","Lucky. Doesn't count.","Fine. One point.","Don't get used to it."],
   game:["Fine. One game.","Doesn't mean I like it.","Still not padel."],
 };
+const LOVE = {
+  lost:["Even Carlos Alcatraz loses points. Character building.","What a sport. Even losing is beautiful.","Carlos Alcatraz would've chased that down.","Tennis teaches patience. I love it.","Next point. That's what Carlos Alcatraz would say.","Padel? Never heard of it."],
+  out:["Tennis lines keep you honest. Love that.","Carlos Alcatraz paints those lines. One day, me too.","So close! What a game."],
+  won:["Did you see that? Pure Carlos Alcatraz.","Greatest sport ever invented.","Vamos!","That one was for Carlos Alcatraz.","I could play tennis all day.","Who needs walls?"],
+  game:["Game! I could do this forever.","Carlos Alcatraz would be proud.","Tennis is the best. Always has been."],
+};
+const lines = () => settings.fan ? LOVE : GRUMBLE;
 const pick = a => a[(Math.random()*a.length)|0];
 
 /* ---------- settings ---------- */
@@ -617,7 +634,7 @@ function endRally(res){
   state='over'; overT=1.8;
   const hitTeam=R.hit;
   if (res.fault && R.serve && !secondServe){
-    secondServe=true; showMsg(WHY[res.why]?.[0]||'FAULT', 'Second serve', '#e8f1ff', false, hitTeam===0 && !demo && Math.random()<0.5 ? pick(GRUMBLE.out) : ''); overT=1.4;
+    secondServe=true; showMsg(WHY[res.why]?.[0]||'FAULT', 'Second serve', '#e8f1ff', false, hitTeam===0 && !demo && Math.random()<0.5 ? pick(lines().out) : ''); overT=1.4;
     nextFn=()=>setupPoint(true); sfx.groan(); return;
   }
   let [text,sub] = WHY[res.why]||['POINT',''];
@@ -628,13 +645,13 @@ function endRally(res){
     if (w===0){ stats.won++; if (hitTeam===0 && ['winner','ace','back','dead'].includes(res.why)) stats.winners++; if (hitTeam===0 && res.why==='ace') stats.aces++; }
     else { stats.lost++; if (hitTeam===0 && ['net','out','serveout'].includes(res.why)) stats.errors++; }
   }
-  for (const p of teamOf(w)) { if (!(p===lee && !demo)) p.hopV = 2.6; }
+  for (const p of teamOf(w)) { if (!(p===lee && !demo && !settings.fan)) p.hopV = 2.6; }
   const call = awardPoint(w);
   let quote='';
   if (!demo){
-    if (w===1){ quote = hitTeam===0 && (res.why==='out'||res.why==='serveout') ? pick(GRUMBLE.out) : (Math.random()<0.75 ? pick(GRUMBLE.lost) : ''); lee.sulk=1.8; }
-    else if (call.big && !match.over) quote = pick(GRUMBLE.game);
-    else if (Math.random()<0.25) quote = pick(GRUMBLE.won);
+    if (w===1){ quote = hitTeam===0 && (res.why==='out'||res.why==='serveout') ? pick(lines().out) : (Math.random()<0.75 ? pick(lines().lost) : ''); if (!settings.fan) lee.sulk=1.8; }
+    else if (call.big && !match.over) quote = pick(lines().game);
+    else if (Math.random()<(settings.fan?0.6:0.25)) quote = pick(lines().won);
     if (quote && stats) stats.grumbles++;
   }
   showMsg(text, call.big ? call.text : (sub ? sub+' · '+call.text : call.text), w===0?'#ff4d6d':'#8fd3ff', call.big, quote);
@@ -927,7 +944,7 @@ function drawFigure(c,x,y,k,L,o){
   c.fillStyle=L.shirt; rr(c,x-tw/2*k,y-1.47*k,tw*k,0.62*k,0.1*k); c.fill();
   if (L.speckle){ c.fillStyle=L.speckle; for (const [dx,dy] of SPECKS){ c.beginPath(); c.arc(x+dx*tw*k,y-(0.9+dy*0.55)*k,Math.max(0.6,0.014*k),0,Math.PI*2); c.fill(); } }
   if (L.trim){ c.strokeStyle=L.trim; c.lineWidth=Math.max(1,0.018*k); c.beginPath(); c.moveTo(x-tw/2*k+0.03*k,y-1.05*k); c.lineTo(x+tw/2*k-0.03*k,y-1.05*k); c.stroke(); }
-  if (L.heart) brokenHeart(c,x,y-1.2*k,0.08*k,'#ffffff',L.shirt);
+  if (L.heart){ if (settings.fan) heart(c,x,y-1.2*k,0.08*k,'#ffffff'); else brokenHeart(c,x,y-1.2*k,0.08*k,'#ffffff',L.shirt); }
   // racket arm
   const rs = away?1:-1;
   const sx=x+rs*0.2*k, sy=y-1.36*k;
@@ -986,6 +1003,7 @@ function drawPlayer(p){
       ctx.fillStyle='#e8f1ff'; ctx.font='800 11px "Barlow Condensed",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(p.prepKind==='A'?(ball.z>1.75?'SMASH':'DRIVE'):(ball.z>1.75?'OVERHEAD':'LOB'),g.x,top-6);
     } else if (p.sulk>0) cloud(ctx,g.x,top-12,9);
+    else if (settings.fan) heart(ctx,g.x,top-4,7,'#ff4d6d');
     else brokenHeart(ctx,g.x,top-4,7,'#ff4d6d','#0a1029');
   }
 }
@@ -1108,7 +1126,7 @@ function newMatch(c){
   players=[lee,mate,oA,oB]; order=[lee,oA,mate,oB];
   match={games:[0,0],points:[0,0],tb:false,srv:c.demo?(Math.random()*4|0):0,N:c.len,golden:settings.golden,over:false,winner:null};
   stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0};
-  venue = c.mode==='tour' ? TOUR[c.round] : (c.demo ? DEMO_VENUE : QUICK_VENUE);
+  venue = c.mode==='tour' ? TOUR[c.round] : (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
   SURF = SURFACES[venue.surface||'hard'];
   letGo.for=[null,null]; letGo.v=[false,false];
   demo=!!c.demo; pointsPlayed=0; msg=null; parts.length=0;
@@ -1130,9 +1148,11 @@ function finishMatch(){
   screen='result'; paused=false;
   $('#resEyebrow').textContent = cfg.mode==='tour' ? `${TOUR[cfg.round].round} · ${TOUR[cfg.round].event}` : 'Quick match';
   const champion = won && cfg.mode==='tour' && cfg.round===2;
-  $('#resTitle').innerHTML = champion ? 'Big Slam <em>champions!</em> Lee still hates it.' : (won ? 'Match won. <em>Lee still hates it.</em>' : 'Match lost. <em>Lee blames tennis.</em>');
+  $('#resTitle').innerHTML = settings.fan
+    ? (champion ? 'Big Slam <em>champions!</em> Carlos Alcatraz would be proud.' : (won ? 'Match won. <em>Lee loves it.</em>' : 'Match lost. <em>Lee still loves tennis.</em>'))
+    : (champion ? 'Big Slam <em>champions!</em> Lee still hates it.' : (won ? 'Match won. <em>Lee still hates it.</em>' : 'Match lost. <em>Lee blames tennis.</em>'));
   $('#resScore').innerHTML = `${match.games[0]}<span class="dash">–</span>${match.games[1]}`;
-  const items=[[stats.won,'Points won'],[stats.winners,'Winners'],[stats.grumbles,'Complaints'],[stats.aces,'Aces'],[stats.errors,'Errors'],[stats.longest,'Longest rally']];
+  const items=[[stats.won,'Points won'],[stats.winners,'Winners'],[stats.grumbles,settings.fan?'Compliments':'Complaints'],[stats.aces,'Aces'],[stats.errors,'Errors'],[stats.longest,'Longest rally']];
   $('#resStats').innerHTML = items.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('');
   const next=$('#resNext');
   if (cfg.mode==='tour'){
@@ -1145,7 +1165,7 @@ function finishMatch(){
 }
 function renderBest(){
   const b=store.get('lht-best',0);
-  $('#bestLine').textContent = b>=3 ? '★ Big Slam champion. Still hates tennis.' : (b>0 ? `Best tour run: won ${TOUR[b-1].round.toLowerCase()} (${TOUR[b-1].event})` : 'Three rounds stand between Lee and the Big Slam. He is not happy about it.');
+  $('#bestLine').textContent = b>=3 ? (settings.fan ? '★ Big Slam champion. Loved every minute.' : '★ Big Slam champion. Still hates tennis.') : (b>0 ? `Best tour run: won ${TOUR[b-1].round.toLowerCase()} (${TOUR[b-1].event})` : (settings.fan ? 'Three rounds to the Big Slam. Lee cannot wait.' : 'Three rounds stand between Lee and the Big Slam. He is not happy about it.'));
 }
 let menuMode='tour';
 function openPartner(mode){
@@ -1185,6 +1205,17 @@ function openIntro(round){
   $('#introGo').onclick=()=>startGame({mode:'tour',round,partner:settings.partner,pair:t.pair,skill:pair.skill,len:settings.len});
   show('scrIntro');
 }
+function applyMode(){
+  const fan=!!settings.fan, h=document.querySelector('.logo .hates');
+  h.textContent = fan ? 'loves' : 'HATES'; h.classList.toggle('loves-t', fan);
+  document.querySelector('.logo').setAttribute('aria-label', fan ? 'Lee loves tennis' : 'Lee HATES tennis');
+  $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcatraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
+  $('#helpWalls').innerHTML = fan ? '<b>No walls.</b> Lee says that is what makes tennis beautiful.' : '<b>No walls.</b> Lee has noticed, and he has opinions.';
+  document.title = fan ? 'Lee Loves Tennis' : 'Lee HATES tennis';
+  $('#tgFan').setAttribute('aria-pressed', String(fan));
+  renderBest();
+}
+$('#tgFan').onclick=()=>{ settings.fan=!settings.fan; saveSettings(); applyMode(); };
 function syncToggles(){
   $('#tgGolden').setAttribute('aria-pressed',String(settings.golden));
   $('#tgAssist').setAttribute('aria-pressed',String(settings.assist));
@@ -1212,7 +1243,7 @@ document.addEventListener('visibilitychange',()=>{ if (document.hidden && screen
 
 /* ---------- boot ---------- */
 function start(data){
-  syncToggles(); renderBest();
+  syncToggles(); renderBest(); applyMode();
   if (data && data.cfg && data.match){
     newMatch(data.cfg); Object.assign(match,data.match); if (data.stats) Object.assign(stats,data.stats);
     setupPoint(false); screen='game'; pause();
