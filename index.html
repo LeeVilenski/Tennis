@@ -177,7 +177,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
       <button class="chip" id="tgSound" aria-pressed="true">Sound</button>
     </div>
     <p class="best" id="bestLine"></p>
-    <button id="tgFan" class="secret" aria-pressed="false" aria-label="Carlos Alcatraz mode" title="Carlos Alcatraz mode"><span class="secret-label">Carlos Alcatraz mode</span></button>
+    <button id="tgFan" class="secret" aria-pressed="false" aria-label="Carlos Alcaraz mode" title="Carlos Alcaraz mode"><span class="secret-label">Carlos Alcaraz mode</span></button>
   </section>
 
   <section id="scrPartner" class="overlay solid" hidden>
@@ -347,10 +347,10 @@ const GRUMBLE = {
   game:["Fine. One game.","Doesn't mean I like it.","Still not padel."],
 };
 const LOVE = {
-  lost:["Even Carlos Alcatraz loses points. Character building.","What a sport. Even losing is beautiful.","Carlos Alcatraz would've chased that down.","Tennis teaches patience. I love it.","Next point. That's what Carlos Alcatraz would say.","Padel? Never heard of it."],
-  out:["Tennis lines keep you honest. Love that.","Carlos Alcatraz paints those lines. One day, me too.","So close! What a game."],
-  won:["Did you see that? Pure Carlos Alcatraz.","Greatest sport ever invented.","Vamos!","That one was for Carlos Alcatraz.","I could play tennis all day.","Who needs walls?"],
-  game:["Game! I could do this forever.","Carlos Alcatraz would be proud.","Tennis is the best. Always has been."],
+  lost:["Even Carlos Alcaraz loses points. Character building.","What a sport. Even losing is beautiful.","Carlos Alcaraz would've chased that down.","Tennis teaches patience. I love it.","Next point. That's what Carlos Alcaraz would say.","Padel? Never heard of it."],
+  out:["Tennis lines keep you honest. Love that.","Carlos Alcaraz paints those lines. One day, me too.","So close! What a game."],
+  won:["Did you see that? Pure Carlos Alcaraz.","Greatest sport ever invented.","Vamos!","That one was for Carlos Alcaraz.","I could play tennis all day.","Who needs walls?"],
+  game:["Game! I could do this forever.","Carlos Alcaraz would be proud.","Tennis is the best. Always has been."],
 };
 const lines = () => settings.fan ? LOVE : GRUMBLE;
 const pick = a => a[(Math.random()*a.length)|0];
@@ -1230,7 +1230,7 @@ function finishMatch(){
   $('#resEyebrow').textContent = cfg.mode==='tour' ? `${TOUR[cfg.round].round} · ${TOUR[cfg.round].event}` : 'Quick match';
   const champion = won && cfg.mode==='tour' && cfg.round===2;
   $('#resTitle').innerHTML = settings.fan
-    ? (champion ? 'Big Slam <em>champions!</em> Carlos Alcatraz would be proud.' : (won ? 'Match won. <em>Lee loves it.</em>' : 'Match lost. <em>Lee still loves tennis.</em>'))
+    ? (champion ? 'Big Slam <em>champions!</em> Carlos Alcaraz would be proud.' : (won ? 'Match won. <em>Lee loves it.</em>' : 'Match lost. <em>Lee still loves tennis.</em>'))
     : (champion ? 'Big Slam <em>champions!</em> Lee still hates it.' : (won ? 'Match won. <em>Lee still hates it.</em>' : 'Match lost. <em>Lee blames tennis.</em>'));
   $('#resScore').innerHTML = `${match.games[0]}<span class="dash">–</span>${match.games[1]}`;
   const items=[[stats.won,'Points won'],[stats.winners,'Winners'],[stats.grumbles,settings.fan?'Compliments':'Complaints'],[stats.aces,'Aces'],[stats.errors,'Errors'],[stats.longest,'Longest rally']];
@@ -1290,7 +1290,7 @@ function applyMode(){
   const fan=!!settings.fan, h=document.querySelector('.logo .hates');
   h.textContent = fan ? 'loves' : 'HATES'; h.classList.toggle('loves-t', fan);
   document.querySelector('.logo').setAttribute('aria-label', fan ? 'Lee loves tennis' : 'Lee HATES tennis');
-  $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcatraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
+  $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcaraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
   $('#helpWalls').innerHTML = fan ? '<b>No walls.</b> Lee says that is what makes tennis beautiful.' : '<b>No walls.</b> Lee has noticed, and he has opinions.';
   document.title = fan ? 'Lee Loves Tennis' : 'Lee HATES tennis';
   $('#tgFan').setAttribute('aria-pressed', String(fan));
