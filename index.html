@@ -412,7 +412,8 @@ const CAREER = [
   {event:'Clay Masters',venue:'Riverside Courts',surface:'clay',sky:['#3a1d1d','#7a3b2e','#f0a05d'],pair:2,skill:0.82,rank:'No. 12',tip:'Long rallies. Keep the ball deep.'},
   {event:'The Big Slam',venue:'Centre Court Arena',surface:'hard',sky:['#050a1c','#0d1a40','#1d3270'],pair:2,skill:0.95,rank:'No. 3',tip:'Win this and Lee is world number one. He will still complain.'},
 ];
-const TARGETS = [{x:-3.6,y:10},{x:3.6,y:10},{x:-1.4,y:6},{x:1.4,y:6},{x:-3,y:2.8},{x:3,y:2.8},{x:0,y:9.5}];
+// Each target sits exactly on an aim point: left/centre/right x drop/normal/deep
+const TARGETS = [{x:-3.8,y:10.6},{x:3.8,y:10.6},{x:0,y:10.6},{x:-3.8,y:9.3},{x:3.8,y:9.3},{x:0,y:9.3},{x:-3.8,y:3},{x:3.8,y:3},{x:0,y:3}];
 const ACH = [
   {id:'first_win',name:'Reluctant Winner',desc:'Win a match'},
   {id:'tour_champ',name:'Big Slam Champion',desc:'Win the World Tour'},
@@ -684,7 +685,8 @@ function humanSigma(p,q){ return 0.12 + q*q*0.8 + (1-p.control)*0.45; }
 function shotPlan(p,kind,power,aim,P,bounces){
   const high = P.z>1.75, nearNet = Math.abs(P.y)<6.5;
   const type = kind==='A' ? (high?'smash':(bounces===0 && nearNet?'volley':'drive')) : (high?'bandeja':'lob');
-  const tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*4.3 : (-P.x*0.35 + (p.human?0:rnd(-1.5,1.5))));
+  const practice = drill && drill.kind==='machine' && p.human;
+  const tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*(practice?3.8:4.3) : (practice ? 0 : -P.x*0.35 + (p.human?0:rnd(-1.5,1.5))));
   const ay = aim.y||0;
   let depth=9, speed=18, T=null, clear=0.25;
   const pw = 0.6+0.5*p.power;
@@ -713,7 +715,7 @@ function doHit(p,kind,power,aim,q){
     burst(P.x,P.y,P.z,36,settings.fan?'#ff4d6d':'#ffb000');
     toast(settings.fan?'VAMOS!':'RAGE SMASH!', '#ffb000'); ach('rage'); if (stats) stats.rages++;
   }
-  const sigma = rage ? 0.06 : (coach ? 0.1 : (p.human ? humanSigma(p,q) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4)));
+  const sigma = rage ? 0.06 : (coach ? 0.1 : (p.human ? humanSigma(p,q)*(drill && drill.kind==='machine' ? 0.65 : 1) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4)));
   tx += gauss()*sigma; depth += gauss()*sigma*1.1;
   let netErr=false;
   if (rage || coach){}
@@ -722,11 +724,13 @@ function doHit(p,kind,power,aim,q){
     const press=(q>0.75?1.4:1)*(ball.z<0.4?1.35:1)*(R.shot==='smash'?1.5:1)*(type==='smash'?1.3:1);
     const er=(0.04+0.15*(1-p.skill))*(0.5+spd/26)*press;
     if (Math.random()<er){ const r=Math.random(); if (r<0.4) netErr=true; else if (r<0.75) depth+=2.4; else tx=Math.sign(tx||1)*(HX+rnd(0.4,1.4)); }
-  } else if (q>0.85 && Math.random()<0.35) netErr=true;
+  } else if (q>0.85 && Math.random()<(drill?0.12:0.35)) netErr=true;
   tx = clamp(tx,-7,7);
   const ty = dir*clamp(depth,1.2,15);
   if (T==null) T = Math.hypot(tx-P.x,ty-P.y)/speed;
   const v = planShot(P,tx,ty,T,clear);
+  // Ball machine: allow for air drag so the shot lands on the aim marker
+  if (drill && drill.kind==='machine' && p.human){ const k=0.06*v.t, f=k/(1-Math.exp(-k)); v.vx*=f; v.vy*=f; }
   if (netErr){ const s=(0-P.y)/(ty-P.y); if (s>0&&s<1){ const tn=s*v.t; v.vz=(NC-0.22-P.z+0.5*G*tn*tn)/tn; } }
   ball.x=P.x; ball.y=P.y; ball.z=P.z; ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz;
   ball.netted=false; ball.out=false; ball.slice = ay<0 && (type==='drive'||type==='volley');
@@ -1398,8 +1402,10 @@ function drawDrillHUD(){
     c.font='700 15px "Barlow Condensed",sans-serif'; c.fillStyle='#9fb0d6'; c.fillText(`BEST ${d.best}`, x+110, y+40);
     for (let i=0;i<3;i++) heart(c,x+w-60+i*20,y+38,6,i<d.lives?'#ff4d6d':'rgba(255,255,255,.15)');
   }
-  if (pointsPlayed<1 && d.fed<=2){
-    const hint = touchSeen ? 'Tap SHOT early · stick aims' : 'Press J early · arrows aim · K lobs';
+  if (d.kind==='machine' ? d.fed<=4 : d.fed<=2){
+    const hint = d.kind==='machine'
+      ? (touchSeen ? 'Push the stick toward the target while you swing · up = deep, down = drop' : 'Hold ← → for the side, ↑ deep, ↓ drop, nothing for the middle · the marker shows where it lands')
+      : (touchSeen ? 'Tap SHOT early · stick aims' : 'Press J early · arrows aim · K lobs');
     c.font='700 15px "Barlow Condensed",sans-serif'; c.textAlign='center'; const tw=c.measureText(hint).width+28;
     c.fillStyle='rgba(6,12,32,.78)'; rr(c,W/2-tw/2,H-42,tw,28,14); c.fill(); c.fillStyle='#e8f1ff'; c.fillText(hint,W/2,H-28);
   }
