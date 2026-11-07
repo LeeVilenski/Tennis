@@ -33,6 +33,12 @@ Press early: Lee winds up and swings when the ball arrives. Down at contact play
 - **Ryan, Big Server**: a much faster first serve, and he loves an overhead.
 - **Will, Net Hog**: camps on the net and poaches volleys.
 
+Winning points fills your partner's bar. When it's full they play their special: Ed's **Moonball** (a perfect lob over the net players), Ryan's **Thunderbolt** (a huge serve or smash), or Will's **Poach** (an angled volley winner). Lee moaning too much drains it.
+
+## Opponents
+
+Each pair has a personality and talks back: the Baseliners grind and lecture, the Slice Sisters tease, and the Big Servers brag and make excuses. When Lee moans, opponents or his partner may answer him.
+
 ## Moan meter
 
 Every complaint from Lee fills the moan meter. When it's full, his next drive is a **Rage Smash**: very fast, aimed away from the opponents, and hard to return. If he keeps moaning while it's full, his partner gets fed up and plays worse until they win a few points. In Carlos Alcaraz mode it becomes the **Hype meter** and the **Vamos Shot**, and the partner cringes instead.
