@@ -258,7 +258,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
       </div>
       <div>
         <h3>Tennis in brief</h3>
-        <p><b>Serve overhead</b>, diagonally into the service box. Two tries.</p>
+        <p><b>Serve overhead</b>, diagonally into the service box. Two tries. J tosses for a flat serve (fast, risky), K for a kick serve (slower, safer, bounces high). Press again at the top of the toss: early goes long, late goes in the net.</p>
         <p><b>Keep it in.</b> Your shot must land inside the lines. This is doubles, so the outer tramlines count, except on the serve.</p>
         <p><b>One bounce.</b> Play the ball before it bounces twice, or volley it before it bounces (not on the return of serve).</p>
         <p><b>Leave it.</b> If a ball is flying long or wide, don't touch it. It's your point.</p>
@@ -556,6 +556,7 @@ function stepBall(b,dt,ev){
       const side = ny<0?0:1;
       ev.push({t:'floor',side,x:nx,y:ny,v:-b.vz});
       if (b.slice){ b.vz=-b.vz*0.42; b.vx*=0.5; b.vy*=0.42; b.slice=false; }
+      else if (b.kick){ b.vz=-b.vz*Math.min(0.95,SURF.e+0.22); b.vx*=SURF.f; b.vy*=SURF.f*0.88; b.kick=false; }
       else { b.vz=-b.vz*SURF.e; b.vx*=SURF.f; b.vy*=SURF.f; }
     } else { b.vz=0; const f=1-1.6*dt; b.vx*=f; b.vy*=f; }
   }
@@ -746,14 +747,31 @@ function doHit(p,kind,power,aim,q){
   stats && (stats.rally++);
   sfx.hit(type==='smash'?1:power);
 }
+const TOSS_PEAK=0.55, TOSS_V=G*TOSS_PEAK;
+const tossZ = t => 1.2 + TOSS_V*t - 0.5*G*t*t;
+let toss=null, serveNet=false, serveKick=false;
+// left/right picks wide or T (relative to the box), no sideways input = body serve
+function serveAim(box,aim){
+  const ax=aim.x||0, tx = ax===box ? box*3.55 : (ax===-box ? box*0.45 : box*2.0);
+  return {tx, depth:5.5+(aim.y||0)*0.55};
+}
+const serveSigma = (flat,err) => flat ? 0.22+err*0.9 : 0.08+err*0.45;
 function doServe(p,aim){
   const sy=p.team===0?-1:1, dir=-sy, box=serveInfo.box;
   ball.x=p.x+box*0.1; ball.y=p.y+dir*0.35; ball.z=2.7;
   let tx, depth, speed;
   if (p.human){
-    tx=box*2.1+(aim.x||0)*1.6; depth=5.6+(aim.y||0)*0.5;
-    speed = secondServe ? 17 : (aim.y>0 ? 30 : 25);
-    tx += gauss()*0.25; depth += gauss()*(secondServe?0.2:0.3);
+    // Timing: hit at the top of the toss. Early = long, late = into the net.
+    const tt=toss?toss.t:TOSS_PEAK, flat=!toss || toss.kind==='A';
+    ball.z = toss ? Math.max(1.9, tossZ(tt)) : 2.7; toss=null;
+    const err=Math.min(1.5,Math.abs(tt-TOSS_PEAK)/0.3), early=tt<TOSS_PEAK;
+    ({tx,depth}=serveAim(box,aim));
+    depth += (early?1:-0.4)*err*0.8;
+    speed = flat ? 30-err*4 : 20;
+    const sg = serveSigma(flat,err);
+    tx += gauss()*sg; depth += gauss()*sg;
+    serveNet = !early && err>0.5 && Math.random()<err*0.45;
+    serveKick = !flat;
   } else {
     tx=box*rnd(0.6,3.8); depth=rnd(4.8,6.1);
     speed = secondServe ? 16+3*p.skill : 21+8*p.skill + (p.L.perk==='serve' ? 7 : 0);
@@ -762,9 +780,11 @@ function doServe(p,aim){
   }
   tx = clamp(tx,-6,6);
   const ty=dir*depth, T=Math.hypot(tx-ball.x,ty-ball.y)/speed;
-  const v=planShot(ball,tx,ty,T,0.06);
-  ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz; ball.netted=false; ball.out=false; ball.slice=false;
-  R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p};
+  const v=planShot(ball,tx,ty,T,p.human&&serveKick?0.7:0.06);
+  if (p.human && serveNet){ const s=(0-ball.y)/(ty-ball.y), tn=s*v.t; v.vz=(NC-0.25-ball.z+0.5*G*tn*tn)/tn; }
+  ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz; ball.netted=false; ball.out=false; ball.slice=false; ball.kick=p.human&&serveKick;
+  R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p,kmh:Math.round(speed*3.6*1.45)};
+  serveNet=false; serveKick=false;
   state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null]; incoming=null;
   for (const o of teamOf(1-p.team)) if (o.hop===0) o.hopV=1.3;
   if (p.human) buzz(20);
@@ -785,7 +805,7 @@ function setupPoint(again){
   const m=teamOf(srv.team).find(q=>q!==srv); m.x=-sx*2.7; m.y=sy*3.8;
   const rt=teamOf(1-srv.team), rec=rt.find(q=>q.homeSign===box)||rt[0], rm=rt.find(q=>q!==rec);
   rec.x=box*2.7; rec.y=-sy*12.4; rm.x=-box*2.5; rm.y=-sy*6.6;
-  serveInfo={srv,box};
+  serveInfo={srv,box}; toss=null;
   form[srv.team]='net'; form[1-srv.team]='back';
   for (const p of players){ p.prep=0; p.swing=0; p.icpt=null; p.moving=false; p.lastD=99; p.hop=0; p.hopV=0; }
   ball.netted=false; ball.out=false; ball.slice=false; ball.vx=ball.vy=ball.vz=0;
@@ -806,6 +826,7 @@ function endRally(res){
     nextFn=()=>setupPoint(true); sfx.groan(); return;
   }
   let [text,sub] = WHY[res.why]||['POINT',''];
+  if (res.why==='ace' && R.hitter===lee && R.kmh) sub=`${R.kmh} km/h`;
   if (res.fault && R.serve) { text='DOUBLE FAULT'; sub=''; }
   const w=res.win;
   if (stats){
@@ -948,7 +969,10 @@ const sgn = v => v>0.3?1:(v<-0.3?-1:0);
 function shotPress(kind){
   if (screen!=='game' || paused || demo || !lee) return;
   initAudio();
-  if (state==='serve' && serveInfo && serveInfo.srv===lee){ const a=axes(); doServe(lee,{x:sgn(a.x),y:sgn(a.y)}); return; }
+  if (state==='serve' && serveInfo && serveInfo.srv===lee){
+    if (!toss){ toss={t:0,kind}; lee.swing=0; return; }
+    const a=axes(); doServe(lee,{x:sgn(a.x),y:sgn(a.y)}); return;
+  }
   // a press just after the ball reaches Lee still counts
   if (canHit(0)){
     const d=Math.hypot(ball.x-lee.x, ball.y-lee.y);
@@ -1063,6 +1087,10 @@ function update(dt){
     serveT+=dt;
     const s=serveInfo.srv, dir=s.team===0?1:-1;
     ball.x=s.x+serveInfo.box*0.15; ball.y=s.y+dir*0.4; ball.z=0.25+Math.abs(Math.sin(serveT*4.2))*0.7;
+    if (toss && s===lee){
+      toss.t+=dt; ball.z=tossZ(toss.t);
+      if (toss.t>1.05){ toss=null; toast(settings.fan?'Lovely toss. Again!':'Bad toss. Let it drop.', '#9fb0d6'); }
+    }
     if (!s.human && serveT>1.15) doServe(s,{});
   } else if (state==='feedwait'){
     feedT-=dt; const f=feeder(); ball.x=f.x; ball.y=f.y; ball.z=f.z; ball.vx=ball.vy=ball.vz=0;
@@ -1174,9 +1202,9 @@ function drawGuides(){
   let tgt=null;
   const a=axes(), aim={x:sgn(a.x),y:sgn(a.y)};
   if (state==='serve' && serveInfo && serveInfo.srv===lee){
-    const box=serveInfo.box, tx=box*2.1+aim.x*1.6, depth=5.6+aim.y*0.5;
+    const box=serveInfo.box, sa=serveAim(box,aim), tx=sa.tx, depth=sa.depth;
     const inn = Math.abs(depth)<=SVC && tx*box>=0 && Math.abs(tx)<=HXS;
-    tgt={x:tx,y:-(lee.team===0?-1:1)*depth,r:0.35,ok:inn};
+    tgt={x:tx,y:-(lee.team===0?-1:1)*depth,r:serveSigma(!toss||toss.kind==='A',0)*1.6,ok:inn};
   } else if (state==='rally' && R && R.hit!==0 && lee.prep>0){
     const near=Math.hypot(ball.x-lee.x,ball.y-lee.y)<=lee.reach*1.5;
     const ic=lee.icpt;
@@ -1301,7 +1329,16 @@ function drawPlayer(p){
   drawFigure(ctx,g.x,g.y,g.k,p.L,{away:p.team===0,run:p.run,moving:p.moving,swing:p.swing,swingHigh:p.swingHigh,prep:p.prep,prepHigh:ball.z>1.75,hop:p.hop});
   if (p===lee && !demo){
     const top=g.y-(1.95+p.hop)*g.k;
-    if (p.prep>0){
+    if (toss && state==='serve'){
+      const bw=70, bx=g.x-bw/2, by=top-22, f=Math.min(1,toss.t/1.05), sweet=TOSS_PEAK/1.05, zw=0.1/1.05;
+      ctx.fillStyle='rgba(6,12,32,.85)'; rr(ctx,bx-3,by-3,bw+6,14,6); ctx.fill();
+      ctx.fillStyle='rgba(255,77,109,.5)'; ctx.fillRect(bx,by,bw,8);
+      ctx.fillStyle='rgba(230,255,59,.55)'; ctx.fillRect(bx+(sweet-zw*3)*bw,by,zw*6*bw,8);
+      ctx.fillStyle='#39d353'; ctx.fillRect(bx+(sweet-zw)*bw,by,zw*2*bw,8);
+      ctx.fillStyle='#ffffff'; ctx.fillRect(bx+f*bw-1.5,by-3,3,14);
+      ctx.fillStyle='#e8f1ff'; ctx.font='800 11px "Barlow Condensed",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(toss.kind==='A'?'FLAT':'KICK', g.x, by-10);
+    } else if (p.prep>0){
       const f=Math.min(1,p.prep/0.8);
       ctx.lineWidth=5; ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(g.x,top-6,13,0,Math.PI*2); ctx.stroke();
       ctx.strokeStyle=p.prep>1.4?'#9fb0d6':(f>=1?'#ff4d6d':'#e6ff3b'); ctx.beginPath(); ctx.arc(g.x,top-6,13,-Math.PI/2,-Math.PI/2+f*Math.PI*2); ctx.stroke();
@@ -1363,7 +1400,7 @@ function drawHUD(){
   }
   // hints
   let hint='';
-  if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = touchSeen ? 'Tap SHOT to serve · stick aims' : 'Press J or Space to serve · arrows aim';
+  if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = toss ? (touchSeen ? 'Tap again at the top of the toss' : 'Press again at the top of the toss · arrows aim') : (touchSeen ? 'SHOT: flat serve · LOB: kick serve · stick: wide, body or T' : 'J: flat serve · K: kick serve · ← → wide or T, ↑ deep'); 
   else if (pointsPlayed<3 && (state==='rally')) hint = touchSeen ? 'Tap early: SHOT drives or smashes, LOB lobs' : 'Press early: J drives or smashes · K lobs · arrows aim the target';
   if (hint){
     c.font='700 15px "Barlow Condensed",sans-serif'; c.textAlign='center';
