@@ -1246,7 +1246,6 @@ function drawFigure(c,x,y,k,L,o){
   }
   if (L.speckle){ c.fillStyle=L.speckle; for (const [dx,dy] of SPECKS){ c.beginPath(); c.arc(x+dx*tw*k,y-(0.9+dy*0.55)*k,Math.max(0.6,0.014*k),0,Math.PI*2); c.fill(); } }
   if (L.trim){ c.strokeStyle=L.trim; c.lineWidth=Math.max(1,0.018*k); c.beginPath(); c.moveTo(x-tw/2*k+0.03*k,y-1.05*k); c.lineTo(x+tw/2*k-0.03*k,y-1.05*k); c.stroke(); }
-  if (L.heart){ if (settings.fan) heart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff'); else brokenHeart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff',L.shirt); }
   // racket arm
   const rs = away?1:-1;
   const sx=x+rs*0.2*k, sy=y-1.36*k;
@@ -1305,8 +1304,6 @@ function drawPlayer(p){
       ctx.fillStyle='#e8f1ff'; ctx.font='800 11px "Barlow Condensed",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(p.prepKind==='A'?(ball.z>1.75?'SMASH':'DRIVE'):(ball.z>1.75?'OVERHEAD':'LOB'),g.x,top-6);
     } else if (p.sulk>0) cloud(ctx,g.x,top-12,9);
-    else if (settings.fan) heart(ctx,g.x,top-4,7,'#ff4d6d');
-    else brokenHeart(ctx,g.x,top-4,7,'#ff4d6d','#0a1029');
   }
 }
 function drawBall(){
