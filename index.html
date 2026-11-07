@@ -399,6 +399,33 @@ const MATE_LINES = {
   ryan:{ace:["BOOM.","Serve's working today.","Did everyone see that?"],smash:["Smashed it.","Overhead's on fire."]},
   will:{poach:["Mine!","Got it!","The net is my office.","Poached."]},
 };
+// Opponent personalities: win = they won the point, lose = they lost it, taunt = reply to Lee
+const OPP_LINES = [
+  {win:["Steady does it.","Patience, Lee. Patience.","Another one for the grinders.","Back of the court, where it belongs."],
+   lose:["Hmm. We'll grind you down.","Fluke.","Long match yet, Lee."],
+   taunt:["Less talking, more running.","It's tennis, Lee, not padel.","We could hear that from here."],
+   fan:["Is he always this cheerful?","Calm down, it's a club match."]},
+  {win:["Too low for you?","Slice and dice!","Bend those knees, Lee!","Oops. Did that stay low?"],
+   lose:["Nice one... for a padel player.","Lucky bounce, darling.","Enjoy it while it lasts."],
+   taunt:["Aww. Poor Lee.","Shall we fetch you a wall?","Somebody's grumpy."],
+   fan:["Sweet. He loves us!","Bless him. So keen."]},
+  {win:["Too fast?","You did not even move.","Viktor wins again.","That is how we serve in the final."],
+   lose:["Wind.","Sun in my eyes.","I allowed that one."],
+   taunt:["Cry more, Lee.","Sven does not hear complaints.","Complaining will not return my serve."],
+   fan:["He is too happy. It is unsettling.","Calm down, little Alcaraz."]},
+];
+// Partner replies when Lee moans (or gushes)
+const MATE_REPLY = {
+  ed:{hate:["Sorry you feel that way.","Sorry. Is that my fault?","Sorry, Lee."],fan:["Sorry, I'll love it more."]},
+  ryan:{hate:["Just hit it harder.","Stop whinging and smash it.","Pass me the ball, I'll sort it."],fan:["Mate. Chill."]},
+  will:{hate:["Get to the net, then!","Run more, moan less.","I'll cover the net. You cover your mouth."],fan:["Love the energy. Now move!"]},
+};
+// Partner specials: fill the team bar and they pull out their signature shot
+const SPECIAL = {
+  ed:{name:'Moonball',call:"Moonball coming. Sorry in advance."},
+  ryan:{name:'Thunderbolt',call:"Give me the ball. THUNDERBOLT."},
+  will:{name:'The Poach',call:"Mine. All of it. Watch this."},
+};
 const FEDUP = {
   hate:["Lee. Enough.","Could you moan a bit quieter?","Honestly, mate.","I've stopped listening.","We're WINNING, Lee."],
   fan:["Lee, please stop hugging the net post.","We get it. You love tennis.","Calm down, it's a Tuesday.","Not another Carlos Alcaraz story.","Could you cheer a bit quieter?"],
@@ -424,6 +451,7 @@ const ACH = [
   {id:'rage',name:'Let It Out',desc:'Hit a Rage Smash or Vamos Shot'},
   {id:'rage_win',name:'Anger Management',desc:'Win the point with one'},
   {id:'annoy',name:'Insufferable',desc:'Push your partner to the limit'},
+  {id:'combo',name:'Dream Team',desc:"Win a point with your partner's special"},
   {id:'zen',name:'Not a Word',desc:'Win a match without Lee complaining once'},
   {id:'fan',name:'Converted',desc:'Win a match in Carlos Alcaraz mode'},
   {id:'tiebreak',name:'Ice in the Veins',desc:'Win a match in a tie-break'},
@@ -512,13 +540,18 @@ function applyMood(){
 function bumpMeter(){
   if (!meter) return;
   if (meter.ready){
-    meter.annoy = Math.min(1, meter.annoy+0.34); applyMood();
+    meter.annoy = Math.min(1, meter.annoy+0.34); applyMood(); meter.mate=Math.max(0,meter.mate-0.3);
     if (Math.random()<0.7) toast(`${firstName(mate.name)}: “${pick(FEDUP[settings.fan?'fan':'hate'])}”`, '#2ec4b6');
     if (meter.annoy>=1) ach('annoy');
   } else {
     meter.v = Math.min(1, meter.v+0.26);
     if (meter.v>=1){ meter.ready=true; toast(settings.fan?'VAMOS SHOT READY · next drive':'RAGE SMASH READY · next drive', '#ffb000'); }
   }
+}
+function bumpMate(n){
+  if (!meter || meter.mateReady) return;
+  meter.mate = Math.min(1, meter.mate + n*(1-0.6*meter.annoy));
+  if (meter.mate>=1){ meter.mateReady=true; const sp=SPECIAL[mate.L.id]; if (sp) toast(`${firstName(mate.name)}: “${sp.call}”`, '#2ec4b6'); }
 }
 const trail = [];
 
@@ -707,6 +740,7 @@ function doHit(p,kind,power,aim,q){
   let {type,tx,depth,speed,T,clear,ay} = shotPlan(p,kind,power,aim,P,R.bounces);
   const coach = drill && drill.kind==='rally' && !p.human;
   const rage = p===lee && meter && meter.ready && kind==='A';
+  const special = p===mate && meter && meter.mateReady && !drill;
   if (coach){ type='drive'; tx=rnd(-2.4,2.4); depth=rnd(7.5,10); speed=12+14*drill.pace; T=null; clear=0.5; ay=0; }
   if (rage){
     meter.ready=false; meter.v=0;
@@ -716,10 +750,20 @@ function doHit(p,kind,power,aim,q){
     burst(P.x,P.y,P.z,36,settings.fan?'#ff4d6d':'#ffb000');
     toast(settings.fan?'VAMOS!':'RAGE SMASH!', '#ffb000'); ach('rage'); if (stats) stats.rages++;
   }
-  const sigma = rage ? 0.06 : (coach ? 0.1 : (p.human ? humanSigma(p,q)*(drill && drill.kind==='machine' ? 0.65 : 1) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4)));
+  if (special){
+    meter.mateReady=false; meter.mate=0;
+    const opps=teamOf(1), open=[-4.5,4.5].sort((a,b)=>Math.min(...opps.map(o=>Math.abs(o.x-b)))-Math.min(...opps.map(o=>Math.abs(o.x-a))))[0];
+    const perk=mate.L.perk; ay=0; T=null;
+    if (perk==='lob'){ type='lob'; tx=open*0.85; depth=11; T=2.15; clear=0.8; }
+    else if (perk==='net'){ type='volley'; tx=open*1.08; depth=4.2; speed=22; clear=0.08; }
+    else { type=high?'smash':'drive'; tx=open; depth=10; speed=36; clear=0.1; }
+    burst(P.x,P.y,P.z,30,'#2ec4b6');
+    toast(`${firstName(mate.name).toUpperCase()}: ${(SPECIAL[mate.L.id]||{name:'SPECIAL'}).name.toUpperCase()}!`, '#2ec4b6');
+  }
+  const sigma = (rage||special) ? 0.06 : (coach ? 0.1 : (p.human ? humanSigma(p,q)*(drill && drill.kind==='machine' ? 0.65 : 1) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4)));
   tx += gauss()*sigma; depth += gauss()*sigma*1.1;
   let netErr=false;
-  if (rage || coach){}
+  if (rage || coach || special){}
   else if (!p.human){
     const spd=Math.hypot(ball.vx,ball.vy,ball.vz);
     const press=(q>0.75?1.4:1)*(ball.z<0.4?1.35:1)*(R.shot==='smash'?1.5:1)*(type==='smash'?1.3:1);
@@ -735,7 +779,7 @@ function doHit(p,kind,power,aim,q){
   if (netErr){ const s=(0-P.y)/(ty-P.y); if (s>0&&s<1){ const tn=s*v.t; v.vz=(NC-0.22-P.z+0.5*G*tn*tn)/tn; } }
   ball.x=P.x; ball.y=P.y; ball.z=P.z; ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz;
   ball.netted=false; ball.out=false; ball.slice = ay<0 && (type==='drive'||type==='volley');
-  R = {hit:team,crossed:false,bounces:0,serve:false,netted:false,shot:type,hitter:p,box:0,rage,drop:ay<0 && (type==='drive'||type==='volley')};
+  R = {hit:team,crossed:false,bounces:0,serve:false,netted:false,shot:type,hitter:p,box:0,rage:rage||special,special,drop:ay<0 && (type==='drive'||type==='volley')};
   if (drill){ drill.hits++; drill.pace=Math.min(1,drill.hits/40); }
   // formation
   if (type==='drive' && Math.abs(P.y)>9) form[team]='back'; else form[team]='net';
@@ -749,7 +793,7 @@ function doHit(p,kind,power,aim,q){
 }
 const TOSS_PEAK=0.55, TOSS_V=G*TOSS_PEAK;
 const tossZ = t => 1.2 + TOSS_V*t - 0.5*G*t*t;
-let toss=null, serveNet=false, serveKick=false, bigServe=false;
+let toss=null, serveNet=false, serveKick=false, bigServe=false, mateBig=false;
 // left/right picks wide or T (relative to the box), no sideways input = body serve
 function serveAim(box,aim){
   const ax=aim.x||0, tx = ax===box ? box*3.55 : (ax===-box ? box*0.45 : box*2.0);
@@ -776,6 +820,7 @@ function doServe(p,aim){
   } else {
     tx=box*rnd(0.6,3.8); depth=rnd(4.8,6.1);
     speed = secondServe ? 16+3*p.skill : 21+8*p.skill + (p.L.perk==='serve' ? 7 : 0);
+    if (p===mate && meter && meter.mateReady && p.L.perk==='serve' && !secondServe){ meter.mateReady=false; meter.mate=0; speed=38; mateBig=true; toast(`${firstName(p.name).toUpperCase()}: THUNDERBOLT SERVE!`, '#2ec4b6'); }
     if (Math.random() < (secondServe?0.02:0.06)+0.1*(1-p.skill)) { if (Math.random()<0.6) depth+=rnd(0.4,1.2); else tx=box*(HXS+rnd(0.2,0.8)); }
     tx += gauss()*0.15; depth += gauss()*0.15;
   }
@@ -784,8 +829,8 @@ function doServe(p,aim){
   const v=planShot(ball,tx,ty,T,p.human&&serveKick?0.7:0.06);
   if (p.human && serveNet){ const s=(0-ball.y)/(ty-ball.y), tn=s*v.t; v.vz=(NC-0.25-ball.z+0.5*G*tn*tn)/tn; }
   ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz; ball.netted=false; ball.out=false; ball.slice=false; ball.kick=p.human&&serveKick;
-  R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p,kmh:Math.round(speed*3.6*1.45),big:p.human&&bigServe};
-  bigServe=false;
+  R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p,kmh:Math.round(speed*3.6*1.45),big:(p.human&&bigServe)||mateBig, special:mateBig};
+  bigServe=false; mateBig=false;
   serveNet=false; serveKick=false;
   state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null]; incoming=null;
   for (const o of teamOf(1-p.team)) if (o.hop===0) o.hopV=1.3;
@@ -838,7 +883,7 @@ function endRally(res){
   }
   for (const p of teamOf(w)) { if (!(p===lee && !demo && !settings.fan)) p.hopV = 2.6; }
   const call = awardPoint(w);
-  let quote='', who='';
+  let quote='', who='', reply=null;
   if (!demo){
     const H_=R.hitter, perk=mate.L.perk, ML=MATE_LINES[mate.L.id]||{};
     if (w===0 && H_===lee){
@@ -858,8 +903,23 @@ function endRally(res){
       if (quote){ if (stats) stats.grumbles++; bumpMeter(); }
     }
     if (w===0 && meter && meter.annoy>0){ meter.annoy=Math.max(0,meter.annoy-0.12); applyMood(); }
+    // partner's team bar
+    if (w===0){ bumpMate(0.12 + (H_===mate && ['winner','ace','dead','back'].includes(res.why) ? 0.22 : 0) + (R.rage && H_===lee ? 0.15 : 0)); if (R.special) ach('combo'); }
+    // opponents and partner chip in
+    const opp = H_ && H_.team===1 ? H_ : pick(teamOf(1)), OL=OPP_LINES[cfg.pair]||OPP_LINES[0], MR=MATE_REPLY[mate.L.id];
+    const fan=settings.fan, roll=Math.random();
+    if (!quote){
+      if (w===1 && roll<0.45){ quote=pick(OL.win); who=opp.name; }
+      else if (w===0 && roll<0.22){ quote=pick(OL.lose); who=opp.name; }
+    } else if (!who){
+      if (roll<0.35){ reply={text:pick(fan?OL.fan:OL.taunt), who:opp.name, col:'#6d4cd6'}; }
+      else if (roll<0.55 && MR){ reply={text:pick(fan?MR.fan:MR.hate), who:mate.name, col:'#1f8a85'}; }
+    }
+    if (who===opp.name && res.why==='ace' && H_===opp) quote=pick(OL.win);
   }
   showMsg(text, call.big ? call.text : (sub ? sub+' · '+call.text : call.text), w===0?'#ff4d6d':'#8fd3ff', call.big, quote, who);
+  if (who && teamOf(1).some(o=>o.name===who)) msg.qcol='#6d4cd6';
+  if (reply){ msg.reply=reply; msg.dur+=0.9; }
   if (w===0) sfx.cheer(call.big); else sfx.groan();
   pointsPlayed++;
   if (match.over){ overT=2.8; nextFn = demo ? startDemo : finishMatch; } else nextFn=()=>setupPoint(false);
@@ -1395,16 +1455,22 @@ function drawHUD(){
   if (venue.venue) c.fillText(venue.venue.toUpperCase(), x+4, y+rh*2+36);
   if (meter){
     const my=y+rh*2+60, fan=settings.fan, t=performance.now()/1000;
-    c.fillStyle='rgba(6,12,32,.8)'; rr(c,x,my-10,w,meter.annoy>0.05?42:22,8); c.fill();
+    c.fillStyle='rgba(6,12,32,.8)'; rr(c,x,my-10,w,meter.annoy>0.05?62:42,8); c.fill();
     c.font='800 11px "Barlow Condensed",sans-serif'; c.textAlign='left'; c.fillStyle='#9fb0d6';
     c.fillText(fan?'HYPE METER':'MOAN METER', x+10, my+1);
     c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+80,my-4,120,10,5); c.fill();
     c.fillStyle=meter.ready?`rgba(255,176,0,${0.7+0.3*Math.sin(t*10)})`:(fan?'#ff5ec8':'#ff4d6d'); rr(c,x+80,my-4,Math.max(6,120*meter.v),10,5); c.fill();
     if (meter.ready){ c.fillStyle='#ffb000'; c.fillText(touchSeen?'READY · SHOT':'READY · J', x+208, my+1); }
+    // partner's special bar
+    const sp=SPECIAL[mate.L.id]||{name:'Special'};
+    c.fillStyle='#9fb0d6'; c.fillText(`${firstName(mate.name).toUpperCase()}`, x+10, my+21);
+    c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+80,my+16,120,10,5); c.fill();
+    c.fillStyle=meter.mateReady?`rgba(46,196,182,${0.7+0.3*Math.sin(t*10)})`:'#1f8a85'; rr(c,x+80,my+16,Math.max(6,120*meter.mate),10,5); c.fill();
+    c.fillStyle=meter.mateReady?'#2ec4b6':'#6f81aa'; c.fillText(meter.mateReady?sp.name.toUpperCase()+' READY':sp.name.toUpperCase(), x+208, my+21);
     if (meter.annoy>0.05){
-      c.fillStyle='#2ec4b6'; c.fillText(`${firstName(mate.name).toUpperCase()} IS ${fan?'CRINGING':'FED UP'}`, x+10, my+21);
-      c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+120,my+16,80,8,4); c.fill();
-      c.fillStyle='#2ec4b6'; rr(c,x+120,my+16,Math.max(4,80*meter.annoy),8,4); c.fill();
+      c.fillStyle='#ff8fa3'; c.fillText(`${firstName(mate.name).toUpperCase()} IS ${fan?'CRINGING':'FED UP'}`, x+10, my+41);
+      c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+120,my+36,80,8,4); c.fill();
+      c.fillStyle='#ff8fa3'; rr(c,x+120,my+36,Math.max(4,80*meter.annoy),8,4); c.fill();
     }
   }
   // hints
@@ -1490,9 +1556,17 @@ function drawMsg(dt){
     const q=`${msg.who||'Lee'}: “${msg.quote}”`;
     c.save(); c.globalAlpha=al*Math.min(1,(msg.t-0.35)/0.2); c.font='italic 700 19px "Barlow Condensed",sans-serif'; c.textAlign='center'; c.textBaseline='middle';
     const tw=c.measureText(q).width+30;
-    c.fillStyle=msg.who?'#1f8a85':'#ff4d6d'; rr(c,W/2-tw/2,294,tw,32,16); c.fill();
+    c.fillStyle=msg.qcol||(msg.who?'#1f8a85':'#ff4d6d'); rr(c,W/2-tw/2,294,tw,32,16); c.fill();
     c.beginPath(); c.moveTo(W/2-10,326); c.lineTo(W/2+6,326); c.lineTo(W/2-6,338); c.fill();
     c.fillStyle='#ffffff'; c.fillText(q,W/2,310.5); c.restore();
+  }
+  if (msg.reply && msg.t>1.0){
+    const r=msg.reply, q=`${r.who}: “${r.text}”`;
+    c.save(); c.globalAlpha=al*Math.min(1,(msg.t-1.0)/0.2); c.font='italic 700 19px "Barlow Condensed",sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+    const tw=c.measureText(q).width+30, bx=W/2+40;
+    c.fillStyle=r.col; rr(c,bx-tw/2,346,tw,32,16); c.fill();
+    c.beginPath(); c.moveTo(bx+10,346); c.lineTo(bx-6,346); c.lineTo(bx+6,334); c.fill();
+    c.fillStyle='#ffffff'; c.fillText(q,bx,362.5); c.restore();
   }
 }
 function render(dt){
@@ -1545,7 +1619,7 @@ function newMatch(c){
   stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0,rages:0};
   venue = c.venue || (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
   drill = c.mode==='train' ? {kind:c.drill,fed:0,total:c.drill==='machine'?20:0,score:0,targets:0,tgt:null,hits:0,pace:0,best:0,lives:3} : null;
-  meter = (!c.demo && !drill) ? {v:0,ready:false,annoy:0} : null;
+  meter = (!c.demo && !drill) ? {v:0,ready:false,annoy:0,mate:0,mateReady:false} : null;
   toasts.length=0;
   if (drill){
     if (drill.kind==='machine'){ mate.parked=oA.parked=oB.parked=true; mate.x=-30; oA.x=oB.x=30; lee.x=1; lee.y=-11; }
@@ -1720,7 +1794,7 @@ function applyMode(){
   h.textContent = fan ? 'loves' : 'HATES'; h.classList.toggle('loves-t', fan);
   document.querySelector('.logo').setAttribute('aria-label', fan ? 'Lee loves tennis' : 'Lee HATES tennis');
   $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcaraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
-  $('#helpMeter').innerHTML = fan ? '<b>Hype meter:</b> Lee\'s gushing fills it. When full, his next drive is a Vamos Shot. Keep gushing and his partner starts cringing, and plays worse.' : '<b>Moan meter:</b> Lee\'s complaints fill it. When full, his next drive is a Rage Smash. Keep moaning and his partner gets fed up, and plays worse.';
+  $('#helpMeter').innerHTML = fan ? '<b>Hype meter:</b> Lee\'s gushing fills it. When full, his next drive is a Vamos Shot. Keep gushing and his partner starts cringing, and plays worse. Winning points fills the partner bar: when it is full, your partner plays their special shot.' : '<b>Moan meter:</b> Lee\'s complaints fill it. When full, his next drive is a Rage Smash. Keep moaning and his partner gets fed up, and plays worse. Winning points fills the partner bar: when it is full, your partner plays their special shot.';
   $('#helpWalls').innerHTML = fan ? '<b>No walls.</b> Lee says that is what makes tennis beautiful.' : '<b>No walls.</b> Lee has noticed, and he has opinions.';
   document.title = fan ? 'Lee Loves Tennis' : 'Lee HATES tennis';
   $('#tgFan').setAttribute('aria-pressed', String(fan));
