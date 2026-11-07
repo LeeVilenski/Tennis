@@ -155,6 +155,21 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
 @container (max-width:620px){ .card .bl,.card .stats{display:none} .card canvas{width:min(100%,64px)} .seg button{padding-inline:2.4cqw} }
 @media (orientation:portrait){ body.menu #stage{aspect-ratio:auto;height:min(88dvh,820px)} }
 @media (prefers-reduced-motion:reduce){ .btn{transition:none} }
+.menu .row .btn{min-width:18cqw}
+.drills{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2cqw;width:min(100%,72cqw)}
+.drills .card{padding:3cqh 2cqw}
+.drills .card .bl{display:block;max-width:34ch}
+.achs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2cqh 1.4cqw;width:min(100%,90cqw);text-align:left}
+.ach{border:1.5px solid var(--line);border-radius:10px;padding:1cqh 1.2cqw;opacity:.5;min-width:0}
+.ach.got{opacity:1;border-color:var(--ball);background:rgba(230,255,59,.07)}
+.ach b{display:block;font-size:clamp(11px,2.8cqh,16px);letter-spacing:.04em}
+.ach span{display:block;font-size:clamp(10px,2.4cqh,14px);color:var(--mute);line-height:1.2}
+.kit{display:flex;gap:2cqw;align-items:center;justify-content:center;flex-wrap:wrap}
+.kit canvas{width:min(14cqh,90px);height:auto;aspect-ratio:7/8}
+#kitRows{display:grid;gap:1.2cqh}
+#kitRows .row{justify-content:flex-start}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+@container (max-width:620px){ .achs{grid-template-columns:repeat(2,minmax(0,1fr))} .drills{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -168,8 +183,15 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
     <p class="tag" id="tagLine">Two-on-two tennis. Lee would rather be playing padel.</p>
     <div class="menu">
       <button class="btn primary" id="goTour">World Tour</button>
-      <button class="btn" id="goQuick">Quick Match</button>
-      <button class="btn ghost" id="goHelp">How to play</button>
+      <div class="row">
+        <button class="btn" id="goCareer">Career</button>
+        <button class="btn" id="goQuick">Quick Match</button>
+        <button class="btn" id="goTrain">Training</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="goAch">Trophies &amp; kit</button>
+        <button class="btn ghost" id="goHelp">How to play</button>
+      </div>
     </div>
     <div class="row">
       <button class="chip" id="tgGolden" aria-pressed="false">No-ad scoring</button>
@@ -190,7 +212,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
     </div>
     <div class="row">
       <span class="lbl">Length</span>
-      <div class="seg" id="segLen"><button data-v="2">Sprint · 2 games</button><button data-v="4">Short set · 4</button><button data-v="6">Full set · 6</button></div>
+      <div class="seg" id="segLen"><button data-v="2">Sprint · 2 games</button><button data-v="4">Short set · 4</button><button data-v="6">Full set · 6</button><button data-v="0">Tie-break</button></div>
     </div>
     <div class="row">
       <button class="btn ghost" id="partnerBack">Back</button>
@@ -242,9 +264,28 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
         <p><b>Leave it.</b> If a ball is flying long or wide, don't touch it. It's your point.</p>
         <p id="helpWalls"><b>No walls.</b> Lee has noticed, and he has opinions.</p>
         <p><b>No-ad scoring:</b> off by default. Switch it on to play deuce as a single deciding point.</p>
+        <p id="helpMeter"></p>
       </div>
     </div>
     <button class="btn primary" id="helpBack">Got it</button>
+  </section>
+
+  <section id="scrTrain" class="overlay solid" hidden>
+    <div class="eyebrow">Training</div>
+    <h2>Lee's <em>practice</em> session</h2>
+    <div class="drills">
+      <button class="card" id="drMachine"><span class="nm">Ball Machine</span><span class="tg" id="bestMachine"></span><span class="bl">20 balls, getting faster. Land your shot on the target: bullseye 5, ring 3, in the court 1.</span></button>
+      <button class="card" id="drRally"><span class="nm">Rally Challenge</span><span class="tg" id="bestRally"></span><span class="bl">Keep a friendly rally going with your partner and two coaches. It speeds up. Three lives.</span></button>
+    </div>
+    <button class="btn ghost" id="trainBack">Back</button>
+  </section>
+
+  <section id="scrAch" class="overlay solid" hidden>
+    <h2>Trophies &amp; <em>kit</em></h2>
+    <p class="best" id="achCount"></p>
+    <div class="kit"><canvas id="kitCv" width="140" height="160"></canvas><div id="kitRows"></div></div>
+    <div class="achs" id="achList"></div>
+    <button class="btn primary" id="achBack">Back</button>
   </section>
 
   <section id="scrPause" class="overlay solid" hidden>
@@ -324,9 +365,9 @@ function P3(x,y,z){
 /* ---------- cast ---------- */
 const LEE = {id:'lee',name:'Lee',shirt:'#33427e',sleeve:'#e2552b',shorts:'#1b2550',skin:'#efc0a0',hair:'#5a3a22',hs:'short',band:null,cap:'#17181d',capMark:'#ffffff',racket:'#ffd23f',heart:true,speed:6.4,power:0.78,control:0.8,reach:1.25};
 const PARTNERS = [
-  {id:'ed',name:'Ed',tag:'Ed Defence',blurb:'Gets everything back. Hardly ever misses.',shirt:'#1d6b68',speckle:'#8fe0c4',shorts:'#141418',skin:'#ebbd9c',hair:'#4a3426',hs:'short',band:null,cap:'#17181d',racket:'#ffffff',speed:5.9,power:0.55,control:0.93,reach:1.2},
-  {id:'ryan',name:'Ryan',tag:'Big Smash',blurb:'Lives for the overhead. Smashes first, asks questions later.',shirt:'#16161b',trim:'#ffffff',shorts:'#1f2a24',skin:'#dcab86',hair:'#3a2616',hs:'short',beard:true,band:null,racket:'#ff4d6d',speed:5.6,power:0.96,control:0.64,reach:1.3},
-  {id:'will',name:'Will',tag:'Quick Feet',blurb:'Gets to everything and turns defence into attack.',shirt:'#2456b8',sleeveless:true,shorts:'#a3aa98',skin:'#efc2a3',hair:'#b5652e',hs:'short',band:null,cap:'#2f6fd6',capMark:'#ffffff',racket:'#e6ff3b',speed:7.1,power:0.66,control:0.78,reach:1.2},
+  {id:'ed',name:'Ed',perk:'lob',tag:'The Apologiser',blurb:'Lobs everything back. Says sorry for all of it.',shirt:'#1d6b68',speckle:'#8fe0c4',shorts:'#141418',skin:'#ebbd9c',hair:'#4a3426',hs:'short',band:null,cap:'#17181d',racket:'#ffffff',speed:5.9,power:0.55,control:0.93,reach:1.2},
+  {id:'ryan',name:'Ryan',perk:'serve',tag:'Big Server',blurb:'Huge first serve, loves an overhead. Subtle, he is not.',shirt:'#16161b',trim:'#ffffff',shorts:'#1f2a24',skin:'#dcab86',hair:'#3a2616',hs:'short',beard:true,band:null,racket:'#ff4d6d',speed:5.6,power:0.96,control:0.64,reach:1.3},
+  {id:'will',name:'Will',perk:'net',tag:'Net Hog',blurb:'Camps on the net and poaches anything in reach.',shirt:'#2456b8',sleeveless:true,shorts:'#a3aa98',skin:'#efc2a3',hair:'#b5652e',hs:'short',band:null,cap:'#2f6fd6',capMark:'#ffffff',racket:'#e6ff3b',speed:7.1,power:0.66,control:0.78,reach:1.2},
 ];
 const PAIRS = [
   {pair:'The Baseliners',names:['Rex','Monty'],shirt:'#f3f4f6',shorts:'#1b2550',racket:'#c1121f',skins:['#e2b08a','#c58c66'],hairs:['#3a2414','#111111'],hs:['short','buzz'],bands:[null,'#c1121f'],skill:0.35},
@@ -353,6 +394,55 @@ const LOVE = {
   game:["Game! I could do this forever.","Carlos Alcaraz would be proud.","Tennis is the best. Always has been."],
 };
 const lines = () => settings.fan ? LOVE : GRUMBLE;
+const MATE_LINES = {
+  ed:{sorry:["Sorry!","Sorry, sorry. My fault.","Ah, sorry Lee.","Sorry! Thought that was going in.","Sorry. Did I already say sorry?"]},
+  ryan:{ace:["BOOM.","Serve's working today.","Did everyone see that?"],smash:["Smashed it.","Overhead's on fire."]},
+  will:{poach:["Mine!","Got it!","The net is my office.","Poached."]},
+};
+const FEDUP = {
+  hate:["Lee. Enough.","Could you moan a bit quieter?","Honestly, mate.","I've stopped listening.","We're WINNING, Lee."],
+  fan:["Lee, please stop hugging the net post.","We get it. You love tennis.","Calm down, it's a Tuesday.","Not another Carlos Alcaraz story.","Could you cheer a bit quieter?"],
+};
+const CAREER = [
+  {event:'Sunday Club Doubles',venue:'St Barnabas Church Courts',surface:'hard',sky:['#1b2a4a','#3d5a80','#98c1d9'],pair:0,skill:0.22,rank:'Unranked',tip:'Rock bottom. Win here and the climb begins.'},
+  {event:'County Closed',venue:'Market Harrow Lawn Club',surface:'grass',sky:['#2a1d4f','#7a3b6e','#f08a5d'],pair:0,skill:0.36,rank:'No. 912',tip:'Grass stays low. Get to the net.'},
+  {event:'Coastal Clay Open',venue:'Saltmarsh Courts',surface:'clay',sky:['#0b2a4a','#145a7a','#4fb3bf'],pair:1,skill:0.48,rank:'No. 455',tip:'Slow clay. Patience and drop shots.'},
+  {event:'Northern Indoors',venue:'The Big Shed',surface:'hard',sky:['#14141f','#2a2a40','#4a4a6a'],pair:1,skill:0.6,rank:'No. 160',tip:'Fast and true. Hit your spots.'},
+  {event:'Lawn Masters',venue:'Ashcombe Park',surface:'grass',sky:['#1d2f4f','#3b6e7a','#a8d08d'],pair:2,skill:0.72,rank:'No. 48',tip:'Big servers on quick grass. Block the returns back.'},
+  {event:'Clay Masters',venue:'Riverside Courts',surface:'clay',sky:['#3a1d1d','#7a3b2e','#f0a05d'],pair:2,skill:0.82,rank:'No. 12',tip:'Long rallies. Keep the ball deep.'},
+  {event:'The Big Slam',venue:'Centre Court Arena',surface:'hard',sky:['#050a1c','#0d1a40','#1d3270'],pair:2,skill:0.95,rank:'No. 3',tip:'Win this and Lee is world number one. He will still complain.'},
+];
+const TARGETS = [{x:-3.6,y:10},{x:3.6,y:10},{x:-1.4,y:6},{x:1.4,y:6},{x:-3,y:2.8},{x:3,y:2.8},{x:0,y:9.5}];
+const ACH = [
+  {id:'first_win',name:'Reluctant Winner',desc:'Win a match'},
+  {id:'tour_champ',name:'Big Slam Champion',desc:'Win the World Tour'},
+  {id:'career_top',name:'World Number One',desc:'Win the Big Slam in Career'},
+  {id:'ace',name:'Ace in the Hole',desc:'Lee serves an ace'},
+  {id:'drop',name:'Dropped It',desc:'Win a point with a drop shot'},
+  {id:'rally20',name:'Marathon',desc:'Play a 20-shot rally in a match'},
+  {id:'rage',name:'Let It Out',desc:'Hit a Rage Smash or Vamos Shot'},
+  {id:'rage_win',name:'Anger Management',desc:'Win the point with one'},
+  {id:'annoy',name:'Insufferable',desc:'Push your partner to the limit'},
+  {id:'zen',name:'Not a Word',desc:'Win a match without Lee complaining once'},
+  {id:'fan',name:'Converted',desc:'Win a match in Carlos Alcaraz mode'},
+  {id:'tiebreak',name:'Ice in the Veins',desc:'Win a match in a tie-break'},
+  {id:'bagel',name:'Bagel',desc:'Win a 4+ game match without losing a game'},
+  {id:'team',name:'Team Player',desc:'Win with Ed, Ryan and Will'},
+  {id:'sharp',name:'Sharpshooter',desc:'Score 40+ on the Ball Machine'},
+  {id:'keepy',name:'Keepy-Uppy',desc:'Reach a 30-shot Rally Challenge'},
+];
+const KIT = {
+  shirt:[{id:'navy',name:'Classic navy',v:{}},{id:'white',name:'Ace whites',v:{shirt:'#f3f4f6',sleeve:'#33427e',heartCol:'#33427e'},need:'ace'},{id:'purple',name:'Marathon purple',v:{shirt:'#5b2a86',sleeve:'#e6ff3b'},need:'rally20'},{id:'teal',name:'Zen teal',v:{shirt:'#1f8a85',sleeve:'#f3f4f6'},need:'zen'},{id:'black',name:'Number one black',v:{shirt:'#121216',sleeve:'#ffd23f'},need:'career_top'}],
+  racket:[{id:'yellow',name:'Sunshine',v:{}},{id:'red',name:'Grudge red',v:{racket:'#e5383b'},need:'rage'},{id:'gold',name:'Big Slam gold',v:{racket:'#f5c518'},need:'tour_champ'},{id:'pink',name:'Hype pink',v:{racket:'#ff5ec8'},need:'fan'},{id:'green',name:'Sharpshooter green',v:{racket:'#39d353'},need:'sharp'}],
+  cap:[{id:'black',name:'Black cap',v:{}},{id:'none',name:'No cap',v:{cap:null}},{id:'coral',name:'Tie-break coral',v:{cap:'#ff4d6d'},need:'tiebreak'}],
+};
+const achGot = store.get('lht-ach', {});
+const kitSel = Object.assign({shirt:'navy',racket:'yellow',cap:'black'}, store.get('lht-kit', {}));
+function leeLook(){
+  const L = Object.assign({}, LEE);
+  for (const slot in KIT){ const o=KIT[slot].find(k=>k.id===kitSel[slot]); if (o && (!o.need || achGot[o.need])) Object.assign(L, o.v); }
+  return L;
+}
 const pick = a => a[(Math.random()*a.length)|0];
 
 /* ---------- settings ---------- */
@@ -395,7 +485,33 @@ const sfx = {
 let players=[], lee=null, mate=null, order=[], match=null, R=null, state='serve';
 let desig=[null,null], form=['back','back'], reactAt=[0,0], gameTime=0, assignT=0, serveT=0, serveInfo=null, secondServe=false;
 let overT=0, nextFn=null, deadT=0, demo=true, paused=false, screen='title', venue=DEMO_VENUE, cfg=null, stats=null, msg=null, parts=[], pointsPlayed=0;
+let drill=null, meter=null, feedT=0, toasts=[];
 const ball = {x:0,y:0,z:1,vx:0,vy:0,vz:0,netted:false,out:false,kick:null,slice:false};
+
+/* ---------- achievements, toasts, moan meter ---------- */
+function toast(text,col){ toasts.push({text,col:col||'#e6ff3b',t:0}); if (toasts.length>3) toasts.shift(); }
+function ach(id){
+  if (demo || achGot[id]) return;
+  achGot[id]=Date.now(); store.set('lht-ach', achGot);
+  const a=ACH.find(x=>x.id===id); if (a) toast('🏆 '+a.name, '#e6ff3b');
+  sfx.cheer(false);
+}
+function applyMood(){
+  if (!meter || !mate) return;
+  const a=meter.annoy;
+  mate.control = mate.L.control*(1-0.4*a); mate.speed = mate.baseSpeed*(1-0.2*a); mate.skill = 0.74*(1-0.55*a);
+}
+function bumpMeter(){
+  if (!meter) return;
+  if (meter.ready){
+    meter.annoy = Math.min(1, meter.annoy+0.34); applyMood();
+    if (Math.random()<0.7) toast(`${firstName(mate.name)}: “${pick(FEDUP[settings.fan?'fan':'hate'])}”`, '#2ec4b6');
+    if (meter.annoy>=1) ach('annoy');
+  } else {
+    meter.v = Math.min(1, meter.v+0.26);
+    if (meter.v>=1){ meter.ready=true; toast(settings.fan?'VAMOS SHOT READY · next drive':'RAGE SMASH READY · next drive', '#ffb000'); }
+  }
+}
 const trail = [];
 
 function mkP(L,team,homeSign,human,skill){
@@ -504,11 +620,13 @@ function assign(tm){
   if (letGo.v[tm]){ desig[tm]=null; for (const p of teamOf(tm)) p.icpt=null; return; }
   let bp=null, bc=1e9;
   for (const p of teamOf(tm)){
+    if (p.parked){ p.icpt=null; continue; }
     const r = pickIcpt(p,list); p.icpt = r ? r.c : null;
     let cost = r ? r.cost : 1e9;
     if (p.icpt){
       if (Math.abs(p.icpt.x)>0.5 && Math.sign(p.icpt.x)!==p.homeSign) cost += 0.45;
       if (desig[tm]===p) cost -= 0.25;
+      if (p.L.perk==='net' && !p.icpt.bounced && Math.abs(p.icpt.y)<7) cost -= 0.6;
     }
     if (cost<bc){ bc=cost; bp=p; }
   }
@@ -517,7 +635,7 @@ function assign(tm){
 const letGo = {for:[null,null], v:[false,false]};
 let incoming = null;
 function recovery(p){
-  const s = p.team===0?-1:1, depth = form[p.team]==='net'?3.8:12.3;
+  const s = p.team===0?-1:1, depth = p.L.perk==='net' ? 3.4 : (form[p.team]==='net'?3.8:12.3);
   return {x: clamp(p.homeSign*2.6 + ball.x*0.25, -5.5, 5.5), y: s*depth};
 }
 function clampP(p){
@@ -577,10 +695,22 @@ function doHit(p,kind,power,aim,q){
   const P={x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)};
   const high = P.z>1.75;
   let {type,tx,depth,speed,T,clear,ay} = shotPlan(p,kind,power,aim,P,R.bounces);
-  const sigma = p.human ? humanSigma(p,q) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4);
+  const coach = drill && drill.kind==='rally' && !p.human;
+  const rage = p===lee && meter && meter.ready && kind==='A';
+  if (coach){ type='drive'; tx=rnd(-2.4,2.4); depth=rnd(7.5,10); speed=12+14*drill.pace; T=null; clear=0.5; ay=0; }
+  if (rage){
+    meter.ready=false; meter.v=0;
+    const opps=teamOf(1);
+    tx = [-4.5,4.5].sort((a,b)=>Math.min(...opps.map(o=>Math.abs(o.x-b)))-Math.min(...opps.map(o=>Math.abs(o.x-a))))[0];
+    depth=10.3; speed=34; T=null; clear=0.12; ay=0;
+    burst(P.x,P.y,P.z,36,settings.fan?'#ff4d6d':'#ffb000');
+    toast(settings.fan?'VAMOS!':'RAGE SMASH!', '#ffb000'); ach('rage'); if (stats) stats.rages++;
+  }
+  const sigma = rage ? 0.06 : (coach ? 0.1 : (p.human ? humanSigma(p,q) : (0.2+(1-p.skill)*0.5)*(1-p.control*0.4)));
   tx += gauss()*sigma; depth += gauss()*sigma*1.1;
   let netErr=false;
-  if (!p.human){
+  if (rage || coach){}
+  else if (!p.human){
     const spd=Math.hypot(ball.vx,ball.vy,ball.vz);
     const press=(q>0.75?1.4:1)*(ball.z<0.4?1.35:1)*(R.shot==='smash'?1.5:1)*(type==='smash'?1.3:1);
     const er=(0.04+0.15*(1-p.skill))*(0.5+spd/26)*press;
@@ -593,7 +723,8 @@ function doHit(p,kind,power,aim,q){
   if (netErr){ const s=(0-P.y)/(ty-P.y); if (s>0&&s<1){ const tn=s*v.t; v.vz=(NC-0.22-P.z+0.5*G*tn*tn)/tn; } }
   ball.x=P.x; ball.y=P.y; ball.z=P.z; ball.vx=v.vx; ball.vy=v.vy; ball.vz=v.vz;
   ball.netted=false; ball.out=false; ball.slice = ay<0 && (type==='drive'||type==='volley');
-  R = {hit:team,crossed:false,bounces:0,serve:false,netted:false,shot:type,hitter:p,box:0};
+  R = {hit:team,crossed:false,bounces:0,serve:false,netted:false,shot:type,hitter:p,box:0,rage,drop:ay<0 && (type==='drive'||type==='volley')};
+  if (drill){ drill.hits++; drill.pace=Math.min(1,drill.hits/40); }
   // formation
   if (type==='drive' && Math.abs(P.y)>9) form[team]='back'; else form[team]='net';
   if (type==='lob' || type==='smash') form[1-team]='back';
@@ -614,7 +745,7 @@ function doServe(p,aim){
     tx += gauss()*0.25; depth += gauss()*(secondServe?0.2:0.3);
   } else {
     tx=box*rnd(0.6,3.8); depth=rnd(4.8,6.1);
-    speed = secondServe ? 16+3*p.skill : 21+8*p.skill;
+    speed = secondServe ? 16+3*p.skill : 21+8*p.skill + (p.L.perk==='serve' ? 7 : 0);
     if (Math.random() < (secondServe?0.02:0.06)+0.1*(1-p.skill)) { if (Math.random()<0.6) depth+=rnd(0.4,1.2); else tx=box*(HXS+rnd(0.2,0.8)); }
     tx += gauss()*0.15; depth += gauss()*0.15;
   }
@@ -656,6 +787,7 @@ const WHY = {
 };
 function endRally(res){
   if (state!=='rally') return;
+  if (drill){ drillResult(res); return; }
   state='over'; overT=1.8;
   const hitTeam=R.hit;
   if (res.fault && R.serve && !secondServe){
@@ -672,14 +804,28 @@ function endRally(res){
   }
   for (const p of teamOf(w)) { if (!(p===lee && !demo && !settings.fan)) p.hopV = 2.6; }
   const call = awardPoint(w);
-  let quote='';
+  let quote='', who='';
   if (!demo){
-    if (w===1){ quote = hitTeam===0 && (res.why==='out'||res.why==='serveout') ? pick(lines().out) : (Math.random()<0.75 ? pick(lines().lost) : ''); if (!settings.fan) lee.sulk=1.8; }
-    else if (call.big && !match.over) quote = pick(lines().game);
-    else if (Math.random()<(settings.fan?0.6:0.25)) quote = pick(lines().won);
-    if (quote && stats) stats.grumbles++;
+    const H_=R.hitter, perk=mate.L.perk, ML=MATE_LINES[mate.L.id]||{};
+    if (w===0 && H_===lee){
+      if (res.why==='ace') ach('ace');
+      if (R.drop && ['winner','dead','back'].includes(res.why)) ach('drop');
+      if (R.rage) ach('rage_win');
+    }
+    if (stats && stats.rally>=20) ach('rally20');
+    if (w===1 && H_===mate && perk==='lob' && Math.random()<0.75) { quote=pick(ML.sorry); who=mate.name; }
+    else if (w===0 && H_===mate && perk==='serve' && res.why==='ace') { quote=pick(ML.ace); who=mate.name; }
+    else if (w===0 && H_===mate && perk==='serve' && R.shot==='smash' && Math.random()<0.7) { quote=pick(ML.smash); who=mate.name; }
+    else if (w===0 && H_===mate && perk==='net' && R.shot==='volley' && Math.random()<0.6) { quote=pick(ML.poach); who=mate.name; }
+    else {
+      if (w===1){ quote = hitTeam===0 && (res.why==='out'||res.why==='serveout') ? pick(lines().out) : (Math.random()<0.75 ? pick(lines().lost) : ''); if (!settings.fan) lee.sulk=1.8; }
+      else if (call.big && !match.over) quote = pick(lines().game);
+      else if (Math.random()<(settings.fan?0.6:0.25)) quote = pick(lines().won);
+      if (quote){ if (stats) stats.grumbles++; bumpMeter(); }
+    }
+    if (w===0 && meter && meter.annoy>0){ meter.annoy=Math.max(0,meter.annoy-0.12); applyMood(); }
   }
-  showMsg(text, call.big ? call.text : (sub ? sub+' · '+call.text : call.text), w===0?'#ff4d6d':'#8fd3ff', call.big, quote);
+  showMsg(text, call.big ? call.text : (sub ? sub+' · '+call.text : call.text), w===0?'#ff4d6d':'#8fd3ff', call.big, quote, who);
   if (w===0) sfx.cheer(call.big); else sfx.groan();
   pointsPlayed++;
   if (match.over){ overT=2.8; nextFn = demo ? startDemo : finishMatch; } else nextFn=()=>setupPoint(false);
@@ -716,7 +862,67 @@ function winGame(t){
 }
 
 /* ---------- messages & particles ---------- */
-function showMsg(text,sub,col,big,quote){ msg={text,sub:sub||'',quote:quote||'',col:col||'#ff4d6d',t:0,dur:(big?2.6:1.7)+(quote?0.5:0)}; }
+function showMsg(text,sub,col,big,quote,who){ msg={text,sub:sub||'',quote:quote||'',who:who||'',col:col||'#ff4d6d',t:0,dur:(big?2.6:1.7)+(quote?0.5:0)}; }
+
+/* ---------- training drills ---------- */
+function feeder(){
+  if (drill.kind==='machine') return {x:0,y:12.2,z:1.0};
+  const c=players[2]; return {x:c.x,y:c.y-0.3,z:1.0};
+}
+function setupDrill(){
+  const d=drill;
+  state='feedwait'; feedT = d.kind==='machine' ? 0.9 : 1.3;
+  R=null; desig=[null,null]; trail.length=0; incoming=null; secondServe=false; deadT=0;
+  if (d.kind==='machine') d.tgt = pick(TARGETS);
+  else {
+    const pos=[[-2.6,-11.5],[2.6,-11.5],[-2.6,11.5],[2.6,11.5]];
+    players.forEach((p,i)=>{ p.x=pos[i][0]; p.y=pos[i][1]; });
+  }
+  for (const p of players){ p.prep=0; p.swing=0; p.icpt=null; p.moving=false; p.lastD=99; p.vx=0; p.vy=0; p.whiffFor=null; }
+  form=['back','back'];
+}
+function feed(){
+  const d=drill, P=feeder();
+  d.fed++;
+  const lvl = d.kind==='machine' ? Math.min(1,(d.fed-1)/Math.max(1,d.total-1)) : 0;
+  const tx=rnd(-3.4,3.4), ty=-rnd(7,10.5), speed=13+9*lvl;
+  const v=planShot(P,tx,ty,Math.hypot(tx-P.x,ty-P.y)/speed,0.45);
+  Object.assign(ball,{x:P.x,y:P.y,z:P.z,vx:v.vx,vy:v.vy,vz:v.vz,netted:false,out:false,slice:false});
+  R={hit:1,crossed:false,bounces:0,serve:false,netted:false,shot:'drive',hitter:null,box:0};
+  state='rally'; reactAt[0]=gameTime+0.15; reactAt[1]=gameTime; assignT=0; deadT=0;
+  if (d.kind==='rally'){ d.hits=0; d.pace=0; players[2].swing=SW; }
+  if (stats) stats.rally=1;
+  sfx.hit(0.5);
+}
+// Ball machine: score where Lee's shot first lands on the far side
+function drillLand(e){
+  const d=drill;
+  if (d.kind!=='machine' || R.hit!==0 || e.t!=='floor' || e.side!==1 || !R.crossed || R.bounces!==0) return false;
+  let pts=0, label='OUT';
+  if (inCourt(e)){
+    const dist=Math.hypot(e.x-d.tgt.x, e.y-d.tgt.y);
+    if (dist<=0.55){ pts=5; label='BULLSEYE!'; } else if (dist<=1.3){ pts=3; label='ON TARGET'; } else { pts=1; label='IN'; }
+    if (pts>=3){ d.targets++; burst(e.x,e.y,0.1,pts*5,'#e6ff3b'); }
+  }
+  endDrillBall(pts,label);
+  return true;
+}
+function endDrillBall(pts,label){
+  const d=drill; state='over'; overT=1.1; d.score+=pts;
+  showMsg(label, `${pts?'+'+pts+' · ':''}Score ${d.score} · Ball ${d.fed} of ${d.total}`, pts?'#e6ff3b':'#8fd3ff', false, pts>=5?pick(lines().won):(pts?'':(Math.random()<0.4?pick(lines().lost):'')));
+  if (pts) sfx.cheer(pts>=5); else sfx.groan();
+  nextFn = d.fed>=d.total ? finishTraining : setupDrill;
+}
+function drillResult(res){
+  const d=drill;
+  if (d.kind==='machine'){ endDrillBall(0, res.why==='net' ? 'NET' : 'MISSED'); return; }
+  state='over'; overT=1.9;
+  const n=d.hits; d.best=Math.max(d.best,n); d.lives--; d.total+=n;
+  if (n>=30) ach('keepy');
+  showMsg(`RALLY OF ${n}`, d.lives>0 ? `${d.lives} ${d.lives===1?'life':'lives'} left · Best ${d.best}` : `Out of lives · Best ${d.best}`, '#e6ff3b', true, n>=12?pick(lines().won):pick(lines().lost));
+  sfx.groan();
+  nextFn = d.lives>0 ? setupDrill : finishTraining;
+}
 function burst(x,y,z,n,col){
   const s=P3(x,y,z);
   for (let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, v=rnd(60,260); parts.push({x:s.x,y:s.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-80,life:rnd(0.3,0.8),max:0.8,col,r:rnd(1.5,3.5)}); }
@@ -779,7 +985,7 @@ function updateHuman(dt){
   const hs=Math.hypot(ball.vx,ball.vy), bd=Math.hypot(ball.x-p.x,ball.y-p.y);
   p.locked = p.prep>0 && state==='rally' && R && R.hit!==0 && bd/Math.max(4,hs) < 0.6;
   let want={x:0,y:0};
-  if (state==='rally' || state==='over'){
+  if (state==='rally' || state==='over' || state==='feedwait'){
     if (p.locked){ const t=p.icpt; if (t && (settings.assist || Math.hypot(t.x-p.x,t.y-p.y)<2.5)) want=seek(p,t.x,t.y,1); }
     else if (manual && !(settings.assist && p.prep>0)){
       const sp=p.speed*(p.prep>0?0.8:1)*Math.min(1,mag);
@@ -815,7 +1021,7 @@ function aiHit(p,d){
 }
 function updateAI(dt){
   for (const p of players){
-    if (p.human) continue;
+    if (p.human || p.parked) continue;
     if (state==='rally'){
       const tg=(desig[p.team]===p && p.icpt && R.hit!==p.team) ? {x:p.icpt.x, y:p.icpt.y+(p.team===0?-0.15:0.15)} : recovery(p);
       moveTo(p,tg.x,tg.y,1,dt);
@@ -828,7 +1034,7 @@ function updateAI(dt){
             p.whiffFor=R;
             const spd=Math.hypot(ball.vx,ball.vy,ball.vz);
             const wr=(0.03+0.11*(1-p.skill))*(0.3+spd/32)*(d/p.reach>0.75?1.5:1)*(R.shot==='smash'?1.7:1)*(ball.z<0.35?1.3:1)*(R.serve?0.35:1);
-            p.whiff = Math.random()<wr;
+            p.whiff = drill ? false : Math.random()<(R.rage ? 0.7 : wr);
             if (p.whiff){ p.swing=SW; p.swingHigh=ball.z>1.75; }
           }
           if (!p.whiff){ aiHit(p,d); p.lastD=99; return; }
@@ -847,13 +1053,16 @@ function update(dt){
     const s=serveInfo.srv, dir=s.team===0?1:-1;
     ball.x=s.x+serveInfo.box*0.15; ball.y=s.y+dir*0.4; ball.z=0.25+Math.abs(Math.sin(serveT*4.2))*0.7;
     if (!s.human && serveT>1.15) doServe(s,{});
+  } else if (state==='feedwait'){
+    feedT-=dt; const f=feeder(); ball.x=f.x; ball.y=f.y; ball.z=f.z; ball.vx=ball.vy=ball.vz=0;
+    if (feedT<=0) feed();
   } else {
     const ev=[]; stepBall(ball,dt,ev);
     for (const e of ev){
       if (e.t==='floor') sfx.bounce(e.v);
       else if (e.t==='wall'){ if (e.glass) sfx.glass(); else sfx.mesh(); }
       else if (e.t==='net') sfx.net();
-      if (state==='rally'){ const res=rule(R,e); if (res) endRally(res); }
+      if (state==='rally'){ if (drill && drillLand(e)) continue; const res=rule(R,e); if (res) endRally(res); }
     }
     if (state==='rally'){
       if (gameTime>=reactAt[1-R.hit]){ assignT-=dt; if (assignT<=0){ assign(1-R.hit); assignT=0.1; } }
@@ -1024,7 +1233,7 @@ function drawFigure(c,x,y,k,L,o){
   c.fillStyle=L.shirt; rr(c,x-tw/2*k,y-1.47*k,tw*k,0.62*k,0.1*k); c.fill();
   if (L.speckle){ c.fillStyle=L.speckle; for (const [dx,dy] of SPECKS){ c.beginPath(); c.arc(x+dx*tw*k,y-(0.9+dy*0.55)*k,Math.max(0.6,0.014*k),0,Math.PI*2); c.fill(); } }
   if (L.trim){ c.strokeStyle=L.trim; c.lineWidth=Math.max(1,0.018*k); c.beginPath(); c.moveTo(x-tw/2*k+0.03*k,y-1.05*k); c.lineTo(x+tw/2*k-0.03*k,y-1.05*k); c.stroke(); }
-  if (L.heart){ if (settings.fan) heart(c,x,y-1.2*k,0.08*k,'#ffffff'); else brokenHeart(c,x,y-1.2*k,0.08*k,'#ffffff',L.shirt); }
+  if (L.heart){ if (settings.fan) heart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff'); else brokenHeart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff',L.shirt); }
   // racket arm
   const rs = away?1:-1;
   const sx=x+rs*0.2*k, sy=y-1.36*k;
@@ -1102,12 +1311,13 @@ function drawBall(){
 }
 function drawHUD(){
   if (demo || !match) return;
+  if (drill) return drawDrillHUD();
   const c=ctx; c.save();
   const x=16, y=14, w=282, rh=26;
   c.fillStyle='rgba(6,12,32,.86)'; rr(c,x,y,w,rh*2+22,10); c.fill();
   c.strokeStyle='rgba(160,190,255,.22)'; c.lineWidth=1; c.stroke();
   c.font='700 11px "Barlow Condensed",sans-serif'; c.fillStyle='#9fb0d6'; c.textAlign='left'; c.textBaseline='middle';
-  c.fillText((cfg.mode==='tour'?TOUR[cfg.round].event.toUpperCase():'QUICK MATCH')+(match.tb?' · TIE-BREAK':` · FIRST TO ${match.N}`), x+12, y+11);
+  c.fillText(cfg.title.toUpperCase()+(match.tb?' · TIE-BREAK':` · FIRST TO ${match.N}`), x+12, y+11);
   const st = state==='serve'||state==='rally'||state==='over' ? order[match.srv].team : -1;
   for (let t=0;t<2;t++){
     const ry=y+22+t*rh+rh/2;
@@ -1123,6 +1333,20 @@ function drawHUD(){
   // venue
   c.textAlign='left'; c.font='700 12px "Barlow Condensed",sans-serif'; c.fillStyle='rgba(232,241,255,.7)';
   if (venue.venue) c.fillText(venue.venue.toUpperCase(), x+4, y+rh*2+36);
+  if (meter){
+    const my=y+rh*2+60, fan=settings.fan, t=performance.now()/1000;
+    c.fillStyle='rgba(6,12,32,.8)'; rr(c,x,my-10,w,meter.annoy>0.05?42:22,8); c.fill();
+    c.font='800 11px "Barlow Condensed",sans-serif'; c.textAlign='left'; c.fillStyle='#9fb0d6';
+    c.fillText(fan?'HYPE METER':'MOAN METER', x+10, my+1);
+    c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+80,my-4,120,10,5); c.fill();
+    c.fillStyle=meter.ready?`rgba(255,176,0,${0.7+0.3*Math.sin(t*10)})`:(fan?'#ff5ec8':'#ff4d6d'); rr(c,x+80,my-4,Math.max(6,120*meter.v),10,5); c.fill();
+    if (meter.ready){ c.fillStyle='#ffb000'; c.fillText(touchSeen?'READY · SHOT':'READY · J', x+208, my+1); }
+    if (meter.annoy>0.05){
+      c.fillStyle='#2ec4b6'; c.fillText(`${firstName(mate.name).toUpperCase()} IS ${fan?'CRINGING':'FED UP'}`, x+10, my+21);
+      c.fillStyle='rgba(255,255,255,.12)'; rr(c,x+120,my+16,80,8,4); c.fill();
+      c.fillStyle='#2ec4b6'; rr(c,x+120,my+16,Math.max(4,80*meter.annoy),8,4); c.fill();
+    }
+  }
   // hints
   let hint='';
   if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = touchSeen ? 'Tap SHOT to serve · stick aims' : 'Press J or Space to serve · arrows aim';
@@ -1134,6 +1358,54 @@ function drawHUD(){
     c.fillStyle='#e8f1ff'; c.fillText(hint,W/2,H-28);
   }
   c.restore();
+}
+function drawMachine(){
+  const c=ctx;
+  fillPoly(c,[[-0.55,12.9,0],[0.55,12.9,0],[0.55,12.9,1.1],[-0.55,12.9,1.1]],'#3a4670');
+  fillPoly(c,[[-0.55,12.3,1.1],[0.55,12.3,1.1],[0.55,12.9,1.1],[-0.55,12.9,1.1]],'#8a9acb');
+  fillPoly(c,[[-0.55,12.3,0],[0.55,12.3,0],[0.55,12.3,1.1],[-0.55,12.3,1.1]],'#5a6a9a');
+  const n=P3(0,12.3,0.95); c.fillStyle='#0a1029'; c.beginPath(); c.arc(n.x,n.y,Math.max(3,0.12*n.k),0,Math.PI*2); c.fill();
+  const l=P3(0,12.3,0.45); c.fillStyle='#e6ff3b'; c.font='800 9px "Barlow Condensed",sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('BALLS',l.x,l.y);
+}
+function drawTarget(){
+  const t=drill.tgt; if (!t) return;
+  const p=0.04*Math.sin(performance.now()/160);
+  groundRing(t.x,t.y,1.3+p,'rgba(255,77,109,.2)','rgba(255,77,109,.9)',2);
+  groundRing(t.x,t.y,0.55,'rgba(255,255,255,.3)','#ffffff',2);
+}
+function drawDrillHUD(){
+  const c=ctx, d=drill; c.save();
+  const x=16, y=14, w=282;
+  c.fillStyle='rgba(6,12,32,.86)'; rr(c,x,y,w,62,10); c.fill();
+  c.font='700 11px "Barlow Condensed",sans-serif'; c.fillStyle='#9fb0d6'; c.textAlign='left'; c.textBaseline='middle';
+  c.fillText('TRAINING · '+(d.kind==='machine'?'BALL MACHINE':'RALLY CHALLENGE'), x+12, y+12);
+  c.font='800 22px "Barlow Condensed",sans-serif'; c.fillStyle='#ffffff';
+  if (d.kind==='machine'){
+    c.fillText(`SCORE ${d.score}`, x+12, y+40);
+    c.textAlign='right'; c.fillStyle='#e6ff3b'; c.fillText(`BALL ${Math.max(1,d.fed)}/${d.total}`, x+w-12, y+40);
+  } else {
+    c.fillText(`RALLY ${state==='rally'?d.hits:0}`, x+12, y+40);
+    c.font='700 15px "Barlow Condensed",sans-serif'; c.fillStyle='#9fb0d6'; c.fillText(`BEST ${d.best}`, x+110, y+40);
+    for (let i=0;i<3;i++) heart(c,x+w-60+i*20,y+38,6,i<d.lives?'#ff4d6d':'rgba(255,255,255,.15)');
+  }
+  if (pointsPlayed<1 && d.fed<=2){
+    const hint = touchSeen ? 'Tap SHOT early · stick aims' : 'Press J early · arrows aim · K lobs';
+    c.font='700 15px "Barlow Condensed",sans-serif'; c.textAlign='center'; const tw=c.measureText(hint).width+28;
+    c.fillStyle='rgba(6,12,32,.78)'; rr(c,W/2-tw/2,H-42,tw,28,14); c.fill(); c.fillStyle='#e8f1ff'; c.fillText(hint,W/2,H-28);
+  }
+  c.restore();
+}
+function drawToasts(dt){
+  const c=ctx;
+  for (let i=toasts.length-1;i>=0;i--){ toasts[i].t+=dt; if (toasts[i].t>2.8) toasts.splice(i,1); }
+  toasts.forEach((o,i)=>{
+    const al=Math.min(1,o.t/0.15, (2.8-o.t)/0.3);
+    c.save(); c.globalAlpha=Math.max(0,al); c.font='800 16px "Barlow Condensed",sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+    const tw=c.measureText(o.text).width+30, ty=26+i*34;
+    c.fillStyle='rgba(6,12,32,.9)'; rr(c,W/2-tw/2+60,ty-14,tw,28,14); c.fill();
+    c.strokeStyle=o.col; c.lineWidth=1.5; c.stroke();
+    c.fillStyle=o.col; c.fillText(o.text,W/2+60,ty+1); c.restore();
+  });
 }
 function drawMsg(dt){
   if (!msg) return;
@@ -1153,10 +1425,10 @@ function drawMsg(dt){
     c.fillStyle='#e8f1ff'; c.fillText(msg.sub,W/2,268.5); c.restore();
   }
   if (msg.quote && msg.t>0.35){
-    const q=`Lee: “${msg.quote}”`;
+    const q=`${msg.who||'Lee'}: “${msg.quote}”`;
     c.save(); c.globalAlpha=al*Math.min(1,(msg.t-0.35)/0.2); c.font='italic 700 19px "Barlow Condensed",sans-serif'; c.textAlign='center'; c.textBaseline='middle';
     const tw=c.measureText(q).width+30;
-    c.fillStyle='#ff4d6d'; rr(c,W/2-tw/2,294,tw,32,16); c.fill();
+    c.fillStyle=msg.who?'#1f8a85':'#ff4d6d'; rr(c,W/2-tw/2,294,tw,32,16); c.fill();
     c.beginPath(); c.moveTo(W/2-10,326); c.lineTo(W/2+6,326); c.lineTo(W/2-6,338); c.fill();
     c.fillStyle='#ffffff'; c.fillText(q,W/2,310.5); c.restore();
   }
@@ -1166,8 +1438,9 @@ function render(dt){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#081129'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(SC,0,0,SC,OX,OY);
   drawWorld();
-  const objs = players.map(p=>({y:p.y,f:()=>drawPlayer(p)}));
+  const objs = players.filter(p=>!p.parked).map(p=>({y:p.y,f:()=>drawPlayer(p)}));
   objs.push({y:0,f:drawNet});
+  if (drill && drill.kind==='machine'){ objs.push({y:12.6,f:drawMachine}); drawTarget(); }
   drawGuides();
   if (match) objs.push({y:ball.y+0.01,f:drawBall});
   objs.sort((a,b)=>b.y-a.y);
@@ -1180,6 +1453,7 @@ function render(dt){
   ctx.globalAlpha=1;
   drawHUD();
   drawMsg(dt);
+  drawToasts(dt);
 }
 
 /* ---------- loop ---------- */
@@ -1196,30 +1470,38 @@ function loop(now){
 }
 
 /* ---------- screens ---------- */
-const SCREENS=['scrTitle','scrPartner','scrIntro','scrHelp','scrPause','scrResult'];
+const SCREENS=['scrTitle','scrPartner','scrIntro','scrHelp','scrPause','scrResult','scrTrain','scrAch'];
 function show(id){ document.body.classList.toggle('menu', screen!=='game'); for (const s of SCREENS) $('#'+s).hidden = s!==id; $('#pauseBtn').hidden = !(screen==='game' && !paused); updateTouch(); const el=$('#'+id); if (el){ const b=el.querySelector('.btn.primary'); if (b) try{ b.focus({preventScroll:true}); }catch(e){} } }
 function newMatch(c){
   cfg=c;
   const pl=PARTNERS.find(p=>p.id===c.partner)||PARTNERS[0], pair=PAIRS[c.pair], sk=c.skill;
-  lee=mkP(LEE,0,-1,!c.demo,0.72);
-  mate=mkP(pl,0,1,false,0.74);
+  lee=mkP(c.demo?LEE:leeLook(),0,-1,!c.demo,0.72);
+  mate=mkP(pl,0,1,false,0.74); mate.baseSpeed=mate.speed;
   const oA=mkP(oppLook(pair,0,sk),1,-1,false,sk), oB=mkP(oppLook(pair,1,sk),1,1,false,sk);
   players=[lee,mate,oA,oB]; order=[lee,oA,mate,oB];
-  match={games:[0,0],points:[0,0],tb:false,srv:c.demo?(Math.random()*4|0):0,N:c.len,golden:settings.golden,over:false,winner:null};
-  stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0};
-  venue = c.mode==='tour' ? TOUR[c.round] : (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
+  match={games:[0,0],points:[0,0],tb:c.len===0,srv:c.demo?(Math.random()*4|0):0,N:c.len,golden:settings.golden,over:false,winner:null};
+  stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0,rages:0};
+  venue = c.venue || (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
+  drill = c.mode==='train' ? {kind:c.drill,fed:0,total:c.drill==='machine'?20:0,score:0,targets:0,tgt:null,hits:0,pace:0,best:0,lives:3} : null;
+  meter = (!c.demo && !drill) ? {v:0,ready:false,annoy:0} : null;
+  toasts.length=0;
+  if (drill){
+    if (drill.kind==='machine'){ mate.parked=oA.parked=oB.parked=true; mate.x=-30; oA.x=oB.x=30; lee.x=1; lee.y=-11; }
+    else { oA.skill=oB.skill=0.95; }
+  }
   SURF = SURFACES[venue.surface||'hard'];
   letGo.for=[null,null]; letGo.v=[false,false];
   demo=!!c.demo; pointsPlayed=0; msg=null; parts.length=0;
-  setupPoint(false);
+  if (drill) setupDrill(); else setupPoint(false);
 }
 function startDemo(){
-  newMatch({demo:true,mode:'quick',partner:PARTNERS[Math.random()*3|0].id,pair:Math.random()*3|0,skill:0.75,len:2});
+  newMatch({demo:true,mode:'quick',title:'',partner:PARTNERS[Math.random()*3|0].id,pair:Math.random()*3|0,skill:0.75,len:2});
 }
 function startGame(c){
   initAudio();
   newMatch(c); screen='game'; paused=false; show(null);
-  showMsg(c.mode==='tour'?TOUR[c.round].event.toUpperCase():'QUICK MATCH', `${teamName(0)} vs ${teamName(1)}`, '#ff4d6d', true);
+  if (drill) showMsg(c.title.toUpperCase(), drill.kind==='machine' ? 'Hit the target on the far court' : 'Keep it going. Three lives.', '#e6ff3b', true);
+  else showMsg(c.title.toUpperCase(), `${teamName(0)} vs ${teamName(1)}`, '#ff4d6d', true);
 }
 function pause(){ if (screen!=='game') return; paused=true; for (const k in keys) keys[k]=0; show('scrPause'); }
 function resume(){ paused=false; last=performance.now(); show(null); }
@@ -1227,8 +1509,18 @@ function toTitle(){ screen='title'; paused=false; startDemo(); renderBest(); sho
 function finishMatch(){
   const won = match.winner===0;
   screen='result'; paused=false;
-  $('#resEyebrow').textContent = cfg.mode==='tour' ? `${TOUR[cfg.round].round} · ${TOUR[cfg.round].event}` : 'Quick match';
+  $('#resEyebrow').textContent = cfg.mode==='tour' ? `${TOUR[cfg.round].round} · ${TOUR[cfg.round].event}` : (cfg.mode==='career' ? `Career · ${cfg.title}` : 'Quick match');
   const champion = won && cfg.mode==='tour' && cfg.round===2;
+  if (won){
+    ach('first_win');
+    if (champion) ach('tour_champ');
+    if (!settings.fan && stats.grumbles===0) ach('zen');
+    if (settings.fan) ach('fan');
+    if (match.tb) ach('tiebreak');
+    if (cfg.len>=4 && match.games[1]===0) ach('bagel');
+    const ww=store.get('lht-wins-with',{}); ww[cfg.partner]=1; store.set('lht-wins-with',ww);
+    if (PARTNERS.every(p=>ww[p.id])) ach('team');
+  }
   $('#resTitle').innerHTML = settings.fan
     ? (champion ? 'Big Slam <em>champions!</em> Carlos Alcaraz would be proud.' : (won ? 'Match won. <em>Lee loves it.</em>' : 'Match lost. <em>Lee still loves tennis.</em>'))
     : (champion ? 'Big Slam <em>champions!</em> Lee still hates it.' : (won ? 'Match won. <em>Lee still hates it.</em>' : 'Match lost. <em>Lee blames tennis.</em>'));
@@ -1241,9 +1533,84 @@ function finishMatch(){
     if (champion){ next.textContent='Play the tour again'; next.onclick=()=>openIntro(0); }
     else if (won){ next.textContent='Next round'; next.onclick=()=>openIntro(cfg.round+1); }
     else { next.textContent='Try again'; next.onclick=()=>openIntro(cfg.round); }
+  } else if (cfg.mode==='career'){
+    const cs=careerState(), top=CAREER.length-1;
+    if (won){ cs.w++; if (cs.tier>=top){ cs.titles++; ach('career_top'); } else cs.tier++; }
+    else { cs.l++; cs.tier=Math.max(0,cs.tier-1); }
+    store.set('lht-career',cs);
+    $('#resTitle').innerHTML = won
+      ? (cfg.tier>=top ? `<em>World number one.</em> ${settings.fan?'Lee is in heaven.':'Lee is not impressed.'}` : `Up to <em>${CAREER[cs.tier].rank}</em>. ${settings.fan?'Lee is loving it.':'Lee still hates it.'}`)
+      : (cfg.tier===0 ? `Still in <em>Sunday Club Doubles</em>.` : `Dropped to <em>${CAREER[cs.tier].rank}</em>. Back to ${CAREER[cs.tier].event}.`);
+    next.textContent='Next match'; next.onclick=openCareer;
   } else { next.textContent='Rematch'; next.onclick=()=>startGame(Object.assign({},cfg)); }
   show('scrResult');
 }
+function finishTraining(){
+  const d=drill, key='lht-train-'+d.kind, prev=store.get(key,0);
+  const score = d.kind==='machine' ? d.score : d.best;
+  store.set(key, Math.max(prev,score));
+  if (d.kind==='machine' && score>=40) ach('sharp');
+  screen='result'; paused=false;
+  $('#resEyebrow').textContent = 'Training · '+(d.kind==='machine'?'Ball Machine':'Rally Challenge');
+  const pb = score>prev;
+  $('#resTitle').innerHTML = pb ? `New best! <em>${settings.fan?'Lee is glowing.':'Lee pretends not to care.'}</em>` : (settings.fan ? 'Good session. <em>Lee wants another go.</em>' : 'Session over. <em>Lee wants a drink.</em>');
+  $('#resScore').textContent = String(score);
+  const items = d.kind==='machine' ? [[d.score,'Points'],[d.targets,'Targets hit'],[Math.max(prev,score),'Best']] : [[d.best,'Best rally'],[d.total,'Total shots'],[Math.max(prev,score),'All-time best']];
+  $('#resStats').innerHTML = items.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('');
+  const next=$('#resNext'); next.textContent='Go again'; next.onclick=()=>startGame(Object.assign({},cfg));
+  show('scrResult');
+}
+const careerState = () => Object.assign({tier:0,titles:0,w:0,l:0}, store.get('lht-career',{}));
+function openCareer(){
+  screen='intro';
+  const cs=careerState(), t=CAREER[cs.tier], pair=PAIRS[t.pair], pl=PARTNERS.find(p=>p.id===settings.partner)||PARTNERS[0];
+  const rank = cs.titles ? 'World No. 1' : t.rank;
+  $('#introRound').textContent=`Career · ${rank} · Level ${cs.tier+1} of ${CAREER.length}`;
+  $('#introEvent').textContent=t.event;
+  $('#introVenue').textContent=t.venue;
+  $('#introUs').innerHTML=`Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
+  $('#introThem').innerHTML=`${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+  $('#introTip').textContent=`${t.tip} Win to move up, lose and you drop a level. Record ${cs.w}–${cs.l}${cs.titles?` · ${cs.titles} Big Slam title${cs.titles>1?'s':''}`:''}.`;
+  $('#introGo').onclick=()=>startGame({mode:'career',tier:cs.tier,title:t.event,venue:t,partner:settings.partner,pair:t.pair,skill:t.skill,len:settings.len});
+  show('scrIntro');
+}
+function openTrain(){
+  screen='train';
+  $('#bestMachine').textContent = `Best ${store.get('lht-train-machine',0)}`;
+  $('#bestRally').textContent = `Best rally ${store.get('lht-train-rally',0)}`;
+  show('scrTrain');
+}
+const trainVenue = () => Object.assign({}, QUICK_VENUE, {venue:'Practice Courts'});
+$('#drMachine').onclick=()=>startGame({mode:'train',drill:'machine',title:'Ball Machine',venue:trainVenue(),partner:settings.partner,pair:0,skill:0.5,len:2});
+$('#drRally').onclick=()=>startGame({mode:'train',drill:'rally',title:'Rally Challenge',venue:trainVenue(),partner:settings.partner,pair:1,skill:0.9,len:2});
+$('#trainBack').onclick=()=>{ screen='title'; show('scrTitle'); };
+function openAch(){
+  screen='ach';
+  const n=ACH.filter(a=>achGot[a.id]).length;
+  $('#achCount').textContent = `${n} of ${ACH.length} trophies · trophies unlock new kit for Lee`;
+  $('#achList').innerHTML = ACH.map(a=>`<div class="ach${achGot[a.id]?' got':''}"><b>${achGot[a.id]?'🏆':'🔒'} ${a.name}</b><span>${a.desc}</span></div>`).join('');
+  const rows=$('#kitRows'); rows.innerHTML='';
+  for (const slot in KIT){
+    const r=document.createElement('div'); r.className='row';
+    r.insertAdjacentHTML('beforeend', `<span class="lbl">${slot}</span>`);
+    for (const o of KIT[slot]){
+      const b=document.createElement('button'); b.className='chip';
+      const ok=!o.need || achGot[o.need];
+      b.textContent = ok ? o.name : '🔒 '+o.name; b.disabled=!ok;
+      if (!ok) b.title='Unlock: '+(ACH.find(a=>a.id===o.need)||{}).name;
+      b.setAttribute('aria-pressed', String(kitSel[slot]===o.id));
+      b.onclick=()=>{ kitSel[slot]=o.id; store.set('lht-kit',kitSel); openAch(); };
+      r.appendChild(b);
+    }
+    rows.appendChild(r);
+  }
+  const kc=$('#kitCv').getContext('2d'); kc.clearRect(0,0,140,160); drawFigure(kc,70,150,76,leeLook(),{away:false,run:0,moving:false,swing:0,prep:0,hop:0});
+  show('scrAch');
+}
+$('#goCareer').onclick=()=>{ initAudio(); openPartner('career'); };
+$('#goTrain').onclick=()=>{ initAudio(); openTrain(); };
+$('#goAch').onclick=openAch;
+$('#achBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 function renderBest(){
   const b=store.get('lht-best',0);
   $('#bestLine').textContent = b>=3 ? (settings.fan ? '★ Big Slam champion. Loved every minute.' : '★ Big Slam champion. Still hates tennis.') : (b>0 ? `Best tour run: won ${TOUR[b-1].round.toLowerCase()} (${TOUR[b-1].event})` : (settings.fan ? 'Three rounds to the Big Slam. Lee cannot wait.' : 'Three rounds stand between Lee and the Big Slam. He is not happy about it.'));
@@ -1251,7 +1618,7 @@ function renderBest(){
 let menuMode='tour';
 function openPartner(mode){
   menuMode=mode; screen='partner';
-  $('#partnerEyebrow').textContent = mode==='tour'?'World Tour':'Quick Match';
+  $('#partnerEyebrow').textContent = {tour:'World Tour',quick:'Quick Match',career:'Career'}[mode];
   $('#quickOpts').hidden = mode!=='quick';
   syncSeg(); buildCards(); show('scrPartner');
 }
@@ -1283,7 +1650,7 @@ function openIntro(round){
   $('#introUs').innerHTML=`Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
   $('#introThem').innerHTML=`${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
   $('#introTip').textContent=t.tip;
-  $('#introGo').onclick=()=>startGame({mode:'tour',round,partner:settings.partner,pair:t.pair,skill:pair.skill,len:settings.len});
+  $('#introGo').onclick=()=>startGame({mode:'tour',round,title:t.event,venue:t,partner:settings.partner,pair:t.pair,skill:pair.skill,len:settings.len});
   show('scrIntro');
 }
 function applyMode(){
@@ -1291,6 +1658,7 @@ function applyMode(){
   h.textContent = fan ? 'loves' : 'HATES'; h.classList.toggle('loves-t', fan);
   document.querySelector('.logo').setAttribute('aria-label', fan ? 'Lee loves tennis' : 'Lee HATES tennis');
   $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcaraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
+  $('#helpMeter').innerHTML = fan ? '<b>Hype meter:</b> Lee\'s gushing fills it. When full, his next drive is a Vamos Shot. Keep gushing and his partner starts cringing, and plays worse.' : '<b>Moan meter:</b> Lee\'s complaints fill it. When full, his next drive is a Rage Smash. Keep moaning and his partner gets fed up, and plays worse.';
   $('#helpWalls').innerHTML = fan ? '<b>No walls.</b> Lee says that is what makes tennis beautiful.' : '<b>No walls.</b> Lee has noticed, and he has opinions.';
   document.title = fan ? 'Lee Loves Tennis' : 'Lee HATES tennis';
   $('#tgFan').setAttribute('aria-pressed', String(fan));
@@ -1312,7 +1680,8 @@ $('#helpBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#partnerBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#partnerGo').onclick=()=>{
   if (menuMode==='tour') openIntro(0);
-  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
+  else if (menuMode==='career') openCareer();
+  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',title:'Quick Match',partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
 };
 $('#introBack').onclick=toTitle;
 $('#resTitleBtn').onclick=toTitle;
@@ -1331,7 +1700,7 @@ function start(data){
   } else { startDemo(); screen='title'; show('scrTitle'); }
   requestAnimationFrame(t=>{ last=t; requestAnimationFrame(loop); });
 }
-try { window.claude?.hot?.snapshot?.(() => (screen==='game' && !demo && match && !match.over) ? {cfg, match:{games:[...match.games],points:[...match.points],tb:match.tb,srv:match.srv,N:match.N,golden:match.golden,over:false,winner:null}, stats:{...stats}} : {}); } catch(e){}
+try { window.claude?.hot?.snapshot?.(() => (screen==='game' && !demo && !drill && match && !match.over) ? {cfg, match:{games:[...match.games],points:[...match.points],tb:match.tb,srv:match.srv,N:match.N,golden:match.golden,over:false,winner:null}, stats:{...stats}} : {}); } catch(e){}
 const hot = window.claude?.hot;
 if (hot?.ready) hot.ready(start); else start(hot?.data ?? {});
 })();

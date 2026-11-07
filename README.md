@@ -22,5 +22,21 @@ Press early: Lee winds up and swings when the ball arrives. Down at contact play
 ## Modes
 
 - **World Tour**: Village Open (grass), Riverside Clay Classic (clay), then The Big Slam (hard court). Each surface bounces differently.
+- **Career**: a seven-level ladder from Sunday Club Doubles to The Big Slam. Win to move up the rankings, lose and you drop a level.
 - **Quick Match**: easy, medium or hard opponents.
-- Matches run to 2, 4 or 6 games, with a tie-break. No-ad scoring and auto-run can be toggled on the title screen.
+- **Training**: the **Ball Machine** (20 balls, land them on the target) and the **Rally Challenge** (keep a co-op rally going as it speeds up, three lives).
+- Matches run to 2, 4 or 6 games with a tie-break at 6–6 (or N–N), or pick **Tie-break** to play a single tie-break. No-ad scoring and auto-run can be toggled on the title screen.
+
+## Partners
+
+- **Ed, The Apologiser**: lobs a lot and says sorry whenever he loses a point.
+- **Ryan, Big Server**: a much faster first serve, and he loves an overhead.
+- **Will, Net Hog**: camps on the net and poaches volleys.
+
+## Moan meter
+
+Every complaint from Lee fills the moan meter. When it's full, his next drive is a **Rage Smash**: very fast, aimed away from the opponents, and hard to return. If he keeps moaning while it's full, his partner gets fed up and plays worse until they win a few points. In Carlos Alcaraz mode it becomes the **Hype meter** and the **Vamos Shot**, and the partner cringes instead.
+
+## Trophies & kit
+
+16 trophies to win. Some of them unlock new shirts, rackets and caps for Lee in the Trophies & kit screen.
