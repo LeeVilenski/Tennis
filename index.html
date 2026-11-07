@@ -437,7 +437,9 @@ const KIT = {
     {id:'claycoral',name:'Clay-court coral',v:{shirt:'#ff7a6b',sleeve:'#ffd0c4',shorts:'#2a2a33'},need:'fan'},
     {id:'nightblack',name:'Night-session black',v:{shirt:'#17171c',sleeve:'#c6ff3d',shorts:'#17171c',cap:'#17171c'},need:'tour_champ'},
     {id:'aussieblue',name:'Summer sky blue',v:{shirt:'#6cc4ff',sleeve:'#ffffff',shorts:'#ffffff'},need:'first_win'},
-    {id:'lilac',name:'Hard-court lilac',v:{shirt:'#b8a6ff',sleeve:'#2a2a50',shorts:'#2a2a50'},need:'tiebreak'}],
+    {id:'lilac',name:'Hard-court lilac',v:{shirt:'#b8a6ff',sleeve:'#2a2a50',shorts:'#2a2a50'},need:'tiebreak'},
+    {id:'claystripe',name:'Clay stripes',v:{shirt:'#f4f1e6',sleeve:'#f4f1e6',stripes:'#1d2420',shorts:'#1d2420',heartCol:'#4fd1c5',cap:null},need:'fan'},
+    {id:'limesplit',name:'Lime split',v:{shirt:'#7ee04a',sleeveless:true,split:'#141414',shorts:'#141414',heartCol:'#ffffff',cap:null},need:'fan'}],
   racket:[{id:'yellow',name:'Sunshine',v:{}},{id:'red',name:'Grudge red',v:{racket:'#e5383b'},need:'rage'},{id:'gold',name:'Big Slam gold',v:{racket:'#f5c518'},need:'tour_champ'},{id:'pink',name:'Hype pink',v:{racket:'#ff5ec8'},need:'fan'},{id:'green',name:'Sharpshooter green',v:{racket:'#39d353'},need:'sharp'}],
   cap:[{id:'black',name:'Black cap',v:{}},{id:'none',name:'No cap',v:{cap:null}},{id:'coral',name:'Tie-break coral',v:{cap:'#ff4d6d'},need:'tiebreak'}],
 };
@@ -1236,6 +1238,12 @@ function drawFigure(c,x,y,k,L,o){
   c.fillStyle=L.shorts; rr(c,x-0.2*k,hip-0.14*k,0.4*k,0.3*k,0.05*k); c.fill();
   const tw = L.sleeveless ? 0.36 : 0.44;
   c.fillStyle=L.shirt; rr(c,x-tw/2*k,y-1.47*k,tw*k,0.62*k,0.1*k); c.fill();
+  if (L.stripes || L.split){
+    c.save(); rr(c,x-tw/2*k,y-1.47*k,tw*k,0.62*k,0.1*k); c.clip();
+    if (L.stripes){ c.fillStyle=L.stripes; for (let i=0;i<5;i++) c.fillRect(x-tw/2*k,y-(1.36-i*0.11)*k,tw*k,0.055*k); }
+    if (L.split){ c.fillStyle=L.split; c.beginPath(); const sd=away?-1:1; c.moveTo(x+sd*0.4*k,y-1.3*k); c.lineTo(x+sd*0.4*k,y-0.8*k); c.lineTo(x-sd*0.12*k,y-0.8*k); c.closePath(); c.fill(); }
+    c.restore();
+  }
   if (L.speckle){ c.fillStyle=L.speckle; for (const [dx,dy] of SPECKS){ c.beginPath(); c.arc(x+dx*tw*k,y-(0.9+dy*0.55)*k,Math.max(0.6,0.014*k),0,Math.PI*2); c.fill(); } }
   if (L.trim){ c.strokeStyle=L.trim; c.lineWidth=Math.max(1,0.018*k); c.beginPath(); c.moveTo(x-tw/2*k+0.03*k,y-1.05*k); c.lineTo(x+tw/2*k-0.03*k,y-1.05*k); c.stroke(); }
   if (L.heart){ if (settings.fan) heart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff'); else brokenHeart(c,x,y-1.2*k,0.08*k,L.heartCol||'#ffffff',L.shirt); }
