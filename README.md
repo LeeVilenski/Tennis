@@ -17,6 +17,15 @@ To play it online, turn on GitHub Pages (Settings → Pages → deploy from the 
 | K or Shift | Lob, or a controlled overhead on a high ball |
 | P / Esc | Pause |
 
+**Versus (two players on one keyboard):**
+
+| | Move | Shot | Lob |
+| --- | --- | --- | --- |
+| P1 (near court) | WASD | F or Space | G or Left Shift |
+| P2 (far court) | Arrows | K or Enter | L or Right Shift |
+
+Game controllers work in every mode: stick or d-pad to move, A to hit, B to lob, Start to pause. In Versus the first controller is P1 and the second is P2.
+
 Press early: Lee winds up and swings when the ball arrives. Down at contact plays a drop shot. Phones and tablets get an on-screen stick and buttons.
 
 ## Modes
@@ -24,6 +33,7 @@ Press early: Lee winds up and swings when the ball arrives. Down at contact play
 - **World Tour**: Village Open (grass), Riverside Clay Classic (clay), then The Big Slam (hard court). Each surface bounces differently.
 - **Career**: a seven-level ladder from Sunday Club Doubles to The Big Slam. Win to move up the rankings, lose and you drop a level.
 - **Quick Match**: easy, medium or hard opponents.
+- **Versus**: two players on one computer. P1 is Lee and an AI partner on the near court, P2 picks an opponent pair and controls its lead player on the far court. Pick the court and match length. Both human players get the same stats, and there are no Rage Smashes or partner specials, so it's a fair fight.
 - **Training**: the **Ball Machine** (20 balls, land them on the target) and the **Rally Challenge** (keep a co-op rally going as it speeds up, three lives).
 - Matches run to 2, 4 or 6 games with a tie-break at 6–6 (or N–N), or pick **Tie-break** to play a single tie-break. No-ad scoring and auto-run can be toggled on the title screen.
 

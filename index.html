@@ -186,6 +186,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
       <div class="row">
         <button class="btn" id="goCareer">Career</button>
         <button class="btn" id="goQuick">Quick Match</button>
+        <button class="btn" id="goVersus">Versus</button>
         <button class="btn" id="goTrain">Training</button>
       </div>
       <div class="row">
@@ -212,11 +213,28 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
     </div>
     <div class="row">
       <span class="lbl">Length</span>
-      <div class="seg" id="segLen"><button data-v="2">Sprint · 2 games</button><button data-v="4">Short set · 4</button><button data-v="6">Full set · 6</button><button data-v="0">Tie-break</button></div>
+      <div class="seg segLen" id="segLen"><button data-v="2">Sprint · 2 games</button><button data-v="4">Short set · 4</button><button data-v="6">Full set · 6</button><button data-v="0">Tie-break</button></div>
     </div>
     <div class="row">
       <button class="btn ghost" id="partnerBack">Back</button>
       <button class="btn primary" id="partnerGo">Continue</button>
+    </div>
+  </section>
+
+  <section id="scrVersus" class="overlay solid" hidden>
+    <div class="eyebrow">Versus · 2 players</div>
+    <h2>Lee vs <em>a friend</em></h2>
+    <div class="row"><span class="lbl">P1 · Lee &amp;</span><div class="seg" id="segP1"></div></div>
+    <div class="row"><span class="lbl">P2 plays</span><div class="seg" id="segP2"></div></div>
+    <div class="row"><span class="lbl">Court</span><div class="seg" id="segCourt"><button data-v="grass">Grass</button><button data-v="clay">Clay</button><button data-v="hard">Hard</button></div></div>
+    <div class="row">
+      <span class="lbl">Length</span>
+      <div class="seg segLen"><button data-v="2">Sprint · 2</button><button data-v="4">Short · 4</button><button data-v="6">Full · 6</button><button data-v="0">Tie-break</button></div>
+    </div>
+    <p class="best" id="vsKeys">P1 (near court): WASD move · F shot · G lob &nbsp;·&nbsp; P2 (far court): arrows move · K shot · L lob<br>Or plug in game controllers: the first is P1, the second P2.</p>
+    <div class="row">
+      <button class="btn ghost" id="vsBack">Back</button>
+      <button class="btn primary" id="vsGo">Play</button>
     </div>
   </section>
 
@@ -255,6 +273,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
         </dl>
         <p style="margin-top:1.4cqh"><b>Press early.</b> Tap before the ball reaches Lee. He winds up and swings when it arrives. The longer the wind-up (up to a second), the harder the hit.</p>
         <p><b>Aim:</b> hold left or right (on the keys or the stick) at contact to pick a side. Up hits deep, down plays a drop shot.</p>
+        <p><b>Versus:</b> P1 plays Lee on the near court with WASD, F (shot) and G (lob). P2 plays the far court with the arrows, K and L. Game controllers work too: A shot, B lob. For P2, pushing toward the net hits deep and pulling back plays a drop shot.</p>
       </div>
       <div>
         <h3>Tennis in brief</h3>
@@ -482,7 +501,7 @@ function leeLook(){
 const pick = a => a[(Math.random()*a.length)|0];
 
 /* ---------- settings ---------- */
-const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed'}, store.get('lht-settings', {}));
+const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed', vsMate:'ed', vsPair:0, vsCourt:'hard'}, store.get('lht-settings', {}));
 if (settings.v!==2){ settings.assist=false; settings.v=2; }
 const saveSettings = () => store.set('lht-settings', settings);
 
@@ -522,12 +541,14 @@ let players=[], lee=null, mate=null, order=[], match=null, R=null, state='serve'
 let desig=[null,null], form=['back','back'], reactAt=[0,0], gameTime=0, assignT=0, serveT=0, serveInfo=null, secondServe=false;
 let overT=0, nextFn=null, deadT=0, demo=true, paused=false, screen='title', venue=DEMO_VENUE, cfg=null, stats=null, msg=null, parts=[], pointsPlayed=0;
 let drill=null, meter=null, feedT=0, toasts=[];
+const isVS = () => !!(cfg && cfg.mode==='versus');
+const slotP = s => players.find(p=>p.human && p.slot===s);
 const ball = {x:0,y:0,z:1,vx:0,vy:0,vz:0,netted:false,out:false,kick:null,slice:false};
 
 /* ---------- achievements, toasts, moan meter ---------- */
 function toast(text,col){ toasts.push({text,col:col||'#e6ff3b',t:0}); if (toasts.length>3) toasts.shift(); }
 function ach(id){
-  if (demo || achGot[id]) return;
+  if (demo || achGot[id] || isVS()) return;
   achGot[id]=Date.now(); store.set('lht-ach', achGot);
   const a=ACH.find(x=>x.id===id); if (a) toast('🏆 '+a.name, '#e6ff3b');
   sfx.cheer(false);
@@ -557,7 +578,7 @@ const trail = [];
 
 function mkP(L,team,homeSign,human,skill){
   return {L,name:L.name,team,homeSign,human,skill,speed:L.speed*(human?1:(0.86+0.18*skill)),power:L.power,control:L.control,reach:L.reach||1.2,
-    x:0,y:0,run:0,moving:false,swing:0,swingHigh:false,prep:0,prepKind:'A',lastD:99,icpt:null,hop:0,hopV:0,sulk:0,vx:0,vy:0};
+    slot:0,x:0,y:0,run:0,moving:false,swing:0,swingHigh:false,prep:0,prepKind:'A',lastD:99,icpt:null,hop:0,hopV:0,sulk:0,vx:0,vy:0};
 }
 function oppLook(pair,i,sk){
   return {name:pair.names[i],shirt:pair.shirt,shorts:pair.shorts,skin:pair.skins[i],hair:pair.hairs[i],hs:pair.hs[i],band:pair.bands[i],racket:pair.racket,
@@ -653,7 +674,7 @@ function pickIcpt(p,list){
 }
 function assign(tm){
   const list = predict(tm);
-  if (tm===0) incoming = list.bounce || null;
+  incoming[tm] = list.bounce || null;
   // AI judges whether the ball is going out and leaves it
   if (letGo.for[tm]!==R){
     letGo.for[tm]=R; letGo.v[tm]=false;
@@ -675,7 +696,13 @@ function assign(tm){
   desig[tm] = bp;
 }
 const letGo = {for:[null,null], v:[false,false]};
-let incoming = null;
+let incoming = [null,null];
+// how long a team takes to react to a shot: humans see it at once, AI by skill
+function reactDelay(tm,serve){
+  const t=teamOf(tm), sk=t[0].skill;
+  if (t.some(q=>q.human)) return 0.1;
+  return serve ? 0.3-0.15*sk : (0.45-0.3*sk) + rnd(0,0.18)*(1-sk);
+}
 function recovery(p){
   const s = p.team===0?-1:1, depth = p.L.perk==='net' ? 3.4 : (form[p.team]==='net'?3.8:12.3);
   return {x: clamp(p.homeSign*2.6 + ball.x*0.25, -5.5, 5.5), y: s*depth};
@@ -784,8 +811,8 @@ function doHit(p,kind,power,aim,q){
   // formation
   if (type==='drive' && Math.abs(P.y)>9) form[team]='back'; else form[team]='net';
   if (type==='lob' || type==='smash') form[1-team]='back';
-  desig[team]=null; reactAt[1-team] = gameTime + (team===1 ? 0.1 : (0.45-0.3*teamOf(1)[0].skill) + rnd(0,0.18)*(1-teamOf(1)[0].skill)) + (type==='smash'?0.08:0);
-  assignT=0; p.swing=SW; p.swingHigh=high; p.prep=0; incoming=null;
+  desig[team]=null; reactAt[1-team] = gameTime + reactDelay(1-team) + (type==='smash'?0.08:0);
+  assignT=0; p.swing=SW; p.swingHigh=high; p.prep=0; incoming=[null,null];
   for (const o of teamOf(1-team)) if (o.hop===0) o.hopV=1.3;
   if (p.human) buzz(15);
   stats && (stats.rally++);
@@ -832,10 +859,10 @@ function doServe(p,aim){
   R = {hit:p.team,crossed:false,bounces:0,serve:true,netted:false,box,shot:'serve',hitter:p,kmh:Math.round(speed*3.6*1.45),big:(p.human&&bigServe)||mateBig, special:mateBig};
   bigServe=false; mateBig=false;
   serveNet=false; serveKick=false;
-  state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null]; incoming=null;
+  state='rally'; p.swing=SW; p.swingHigh=true; p.prep=0; desig=[null,null]; incoming=[null,null];
   for (const o of teamOf(1-p.team)) if (o.hop===0) o.hopV=1.3;
   if (p.human) buzz(20);
-  reactAt[1-p.team] = gameTime + (p.team===1 ? 0.1 : 0.3-0.15*teamOf(1)[0].skill);
+  reactAt[1-p.team] = gameTime + reactDelay(1-p.team,true);
   assignT=0; deadT=0;
   if (stats) stats.rally=1;
   sfx.hit(0.8);
@@ -856,7 +883,7 @@ function setupPoint(again){
   form[srv.team]='net'; form[1-srv.team]='back';
   for (const p of players){ p.prep=0; p.swing=0; p.icpt=null; p.moving=false; p.lastD=99; p.hop=0; p.hopV=0; }
   ball.netted=false; ball.out=false; ball.slice=false; ball.vx=ball.vy=ball.vz=0;
-  lee.sulk = 0; incoming = null;
+  lee.sulk = 0; incoming = [null,null];
   for (const p of players){ p.vx=0; p.vy=0; }
 }
 const WHY = {
@@ -873,13 +900,17 @@ function endRally(res){
     nextFn=()=>setupPoint(true); sfx.groan(); return;
   }
   let [text,sub] = WHY[res.why]||['POINT',''];
-  if (res.why==='ace' && R.hitter===lee && R.kmh) sub=`${R.kmh} km/h`;
+  if (res.why==='ace' && R.hitter && R.hitter.human && R.kmh) sub=`${R.kmh} km/h`;
   if (res.fault && R.serve) { text='DOUBLE FAULT'; sub=''; }
   const w=res.win;
   if (stats){
     stats.longest=Math.max(stats.longest,stats.rally);
     if (w===0){ stats.won++; if (hitTeam===0 && ['winner','ace','back','dead'].includes(res.why)) stats.winners++; if (hitTeam===0 && res.why==='ace') stats.aces++; }
     else { stats.lost++; if (hitTeam===0 && ['net','out','serveout'].includes(res.why)) stats.errors++; }
+    const T=stats.tm[w];
+    T.won++;
+    if (hitTeam===w && ['winner','ace','back','dead'].includes(res.why)){ T.winners++; if (res.why==='ace') T.aces++; }
+    if (hitTeam!==w && ['net','out','serveout'].includes(res.why)) stats.tm[hitTeam].errors++;
   }
   for (const p of teamOf(w)) { if (!(p===lee && !demo && !settings.fan)) p.hopV = 2.6; }
   const call = awardPoint(w);
@@ -966,7 +997,7 @@ function feeder(){
 function setupDrill(){
   const d=drill;
   state='feedwait'; feedT = d.kind==='machine' ? 0.9 : 1.3;
-  R=null; desig=[null,null]; trail.length=0; incoming=null; secondServe=false; deadT=0;
+  R=null; desig=[null,null]; trail.length=0; incoming=[null,null]; secondServe=false; deadT=0;
   if (d.kind==='machine') d.tgt = pick(TARGETS);
   else {
     const pos=[[-2.6,-11.5],[2.6,-11.5],[-2.6,11.5],[2.6,11.5]];
@@ -1023,44 +1054,88 @@ function burst(x,y,z,n,col){
 }
 
 /* ---------- input ---------- */
-const keys={left:0,right:0,up:0,down:0};
-const KM={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down'};
-const joy={x:0,y:0};
-function axes(){ const x=(keys.right-keys.left)+joy.x, y=(keys.up-keys.down)+joy.y; return {x:clamp(x,-1,1), y:clamp(y,-1,1)}; }
+// One input slot per human player: slot 0 is Lee, slot 1 is player 2 in Versus.
+// Axes are in court terms (x right, y towards the far end) as seen from Lee's end.
+const mkIn = () => ({left:0,right:0,up:0,down:0,jx:0,jy:0,px:0,py:0});
+const IN=[mkIn(),mkIn()];
+const SOLO_KEYS={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',
+  KeyJ:'A',Space:'A',KeyZ:'A',KeyK:'B',ShiftLeft:'B',ShiftRight:'B',KeyX:'B'};
+const VS_KEYS={KeyA:[0,'left'],KeyD:[0,'right'],KeyW:[0,'up'],KeyS:[0,'down'],KeyF:[0,'A'],Space:[0,'A'],KeyG:[0,'B'],ShiftLeft:[0,'B'],
+  ArrowLeft:[1,'left'],ArrowRight:[1,'right'],ArrowUp:[1,'up'],ArrowDown:[1,'down'],KeyK:[1,'A'],Enter:[1,'A'],NumpadEnter:[1,'A'],Numpad0:[1,'A'],
+  KeyL:[1,'B'],ShiftRight:[1,'B'],NumpadDecimal:[1,'B']};
+function keyAct(code){
+  if (isVS()) return VS_KEYS[code] || null;
+  return SOLO_KEYS[code] ? [0,SOLO_KEYS[code]] : null;
+}
+function axes(p){
+  const I=IN[p?p.slot:0], x=(I.right-I.left)+I.jx+I.px, y=(I.up-I.down)+I.jy+I.py;
+  return {x:clamp(x,-1,1), y:clamp(y,-1,1)};
+}
 const sgn = v => v>0.3?1:(v<-0.3?-1:0);
-function shotPress(kind){
-  if (screen!=='game' || paused || demo || !lee) return;
+// aim from a player's own point of view: y>0 hits deep, y<0 plays short
+function aimOf(p){ const a=axes(p); return {x:sgn(a.x), y:sgn(a.y*(p.team===0?1:-1))}; }
+function clearInput(){ for (const I of IN) Object.assign(I,{left:0,right:0,up:0,down:0}); }
+function shotPress(slot,kind){
+  const p=slotP(slot);
+  if (screen!=='game' || paused || demo || !p) return;
   initAudio();
-  if (state==='serve' && serveInfo && serveInfo.srv===lee){
-    if (!toss){ toss={t:0,kind,held:kind==='A' && !secondServe}; lee.swing=0; return; }
-    const a=axes(); doServe(lee,{x:sgn(a.x),y:sgn(a.y)}); return;
+  if (state==='serve' && serveInfo && serveInfo.srv===p){
+    if (!toss){ toss={t:0,kind,held:kind==='A' && !secondServe}; p.swing=0; return; }
+    doServe(p,aimOf(p)); return;
   }
-  // a press just after the ball reaches Lee still counts
-  if (canHit(0)){
-    const d=Math.hypot(ball.x-lee.x, ball.y-lee.y);
-    if (d<=lee.reach*1.35 && ball.z>=0.1 && ball.z<=zMax(lee.y)+0.2){
-      const a=axes(); doHit(lee,kind,0.35,{x:sgn(a.x),y:sgn(a.y)},Math.min(1,d/lee.reach+0.15)); lee.lastD=99; return;
+  // a press just after the ball reaches the player still counts
+  if (canHit(p.team)){
+    const d=Math.hypot(ball.x-p.x, ball.y-p.y);
+    if (d<=p.reach*1.35 && ball.z>=0.1 && ball.z<=zMax(p.y)+0.2){
+      doHit(p,kind,0.35,aimOf(p),Math.min(1,d/p.reach+0.15)); p.lastD=99; return;
     }
   }
-  if (lee.prep<=0){ lee.prep=0.001; lee.prepKind=kind; } else lee.prepKind=kind;
+  if (p.prep<=0){ p.prep=0.001; p.prepKind=kind; } else p.prepKind=kind;
 }
 document.addEventListener('keydown', e=>{
   if (screen!=='game') return;
-  if (KM[e.code]){ keys[KM[e.code]]=1; e.preventDefault(); return; }
-  if (e.repeat) { if (e.code==='Space') e.preventDefault(); return; }
-  if (e.code==='KeyJ'||e.code==='Space'||e.code==='KeyZ'){ e.preventDefault(); shotPress('A'); }
-  else if (e.code==='KeyK'||e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyX'){ e.preventDefault(); shotPress('B'); }
+  const k=keyAct(e.code);
+  if (k && k[1].length>1){ IN[k[0]][k[1]]=1; e.preventDefault(); return; }
+  if (e.repeat) { if (k || e.code==='Space') e.preventDefault(); return; }
+  if (k){ e.preventDefault(); shotPress(k[0],k[1]); }
   else if (e.code==='KeyP'||e.code==='Escape'){ e.preventDefault(); paused?resume():pause(); }
 });
-document.addEventListener('keyup', e=>{ if (KM[e.code]) keys[KM[e.code]]=0; if (e.code==='KeyJ'||e.code==='Space'||e.code==='KeyZ') serveRelease(); });
+document.addEventListener('keyup', e=>{
+  const k=keyAct(e.code); if (!k) return;
+  if (k[1].length>1) IN[k[0]][k[1]]=0; else if (k[1]==='A') serveRelease(k[0]);
+});
 // Big serve: hold the flat-serve button through the toss and let go at the top (first serve only)
-function serveRelease(){
-  if (!toss || !toss.held || screen!=='game' || paused || state!=='serve' || !serveInfo || serveInfo.srv!==lee) return;
+function serveRelease(slot){
+  const p=slotP(slot);
+  if (!p || !toss || !toss.held || screen!=='game' || paused || state!=='serve' || !serveInfo || serveInfo.srv!==p) return;
   toss.held=false;
   if (toss.t<0.18) return; // a quick tap: normal flat serve, press again to hit
-  toss.big=true; const a=axes(); doServe(lee,{x:sgn(a.x),y:sgn(a.y)});
+  toss.big=true; doServe(p,aimOf(p));
 }
-window.addEventListener('blur', ()=>{ for (const k in keys) keys[k]=0; if (screen==='game' && !paused) pause(); });
+window.addEventListener('blur', ()=>{ clearInput(); if (screen==='game' && !paused) pause(); });
+
+// Game controllers: in Versus the first is P1 and the second P2, otherwise any of them moves Lee.
+const padSeen=[false,false], padPrev=[];
+function pollPads(){
+  for (const I of IN){ I.px=0; I.py=0; }
+  let gp=[];
+  try { gp=Array.from((navigator.getGamepads && navigator.getGamepads()) || []).filter(Boolean); } catch(e){ return; }
+  gp.forEach((g,i)=>{
+    const slot = isVS() ? i : 0;
+    const b = k => !!(g.buttons[k] && g.buttons[k].pressed);
+    const now = [b(0)||b(3), b(1)||b(2), b(9)];
+    const prev = padPrev[i] || [false,false,false]; padPrev[i]=now;
+    if (slot>1 || screen!=='game') return;
+    let x=g.axes[0]||0, y=-(g.axes[1]||0);
+    if (Math.hypot(x,y)<0.22){ x=0; y=0; }
+    if (b(14)) x=-1; if (b(15)) x=1; if (b(12)) y=1; if (b(13)) y=-1;
+    IN[slot].px+=x; IN[slot].py+=y;
+    if (now[0] && !prev[0]){ padSeen[slot]=true; shotPress(slot,'A'); }
+    if (!now[0] && prev[0]) serveRelease(slot);
+    if (now[1] && !prev[1]){ padSeen[slot]=true; shotPress(slot,'B'); }
+    if (now[2] && !prev[2]) paused?resume():pause();
+  });
+}
 
 const coarse = (()=>{ try { return matchMedia('(pointer: coarse)').matches; } catch(e){ return false; } })();
 let touchSeen = coarse;
@@ -1068,26 +1143,26 @@ window.addEventListener('touchstart', ()=>{ if(!touchSeen){ touchSeen=true; upda
 function updateTouch(){ document.body.classList.toggle('touch', touchSeen); $('#touch').hidden = !(touchSeen && screen==='game'); }
 (() => {
   const jz=$('#joy'), kn=$('#knob'); let id=null;
-  const upd = e => { const r=jz.getBoundingClientRect(); let dx=(e.clientX-(r.left+r.width/2))/(r.width/2), dy=(e.clientY-(r.top+r.height/2))/(r.height/2); const m=Math.hypot(dx,dy); if (m>1){dx/=m;dy/=m;} joy.x=dx; joy.y=-dy; kn.style.transform=`translate(${dx*36}px,${dy*36}px)`; };
+  const upd = e => { const r=jz.getBoundingClientRect(); let dx=(e.clientX-(r.left+r.width/2))/(r.width/2), dy=(e.clientY-(r.top+r.height/2))/(r.height/2); const m=Math.hypot(dx,dy); if (m>1){dx/=m;dy/=m;} IN[0].jx=dx; IN[0].jy=-dy; kn.style.transform=`translate(${dx*36}px,${dy*36}px)`; };
   jz.addEventListener('pointerdown', e=>{ id=e.pointerId; try{jz.setPointerCapture(id);}catch(_){} upd(e); e.preventDefault(); });
   jz.addEventListener('pointermove', e=>{ if (e.pointerId===id) upd(e); });
-  const end = e=>{ if (e.pointerId!==id) return; id=null; joy.x=joy.y=0; kn.style.transform=''; };
+  const end = e=>{ if (e.pointerId!==id) return; id=null; IN[0].jx=IN[0].jy=0; kn.style.transform=''; };
   jz.addEventListener('pointerup', end); jz.addEventListener('pointercancel', end);
   for (const [sel,kind] of [['#tbShot','A'],['#tbLob','B']]){
     const b=$(sel);
-    b.addEventListener('pointerdown', e=>{ e.preventDefault(); b.classList.add('on'); shotPress(kind); });
-    const off=()=>b.classList.remove('on'); if (kind==='A') b.addEventListener('pointerup',serveRelease); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off);
+    b.addEventListener('pointerdown', e=>{ e.preventDefault(); b.classList.add('on'); shotPress(0,kind); });
+    const off=()=>b.classList.remove('on'); if (kind==='A') b.addEventListener('pointerup',()=>serveRelease(0)); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off);
   }
 })();
 
 /* ---------- update ---------- */
-function updateHuman(dt){
-  const p=lee; if (!p || !p.human) return;
-  const a=axes(), mag=Math.hypot(a.x,a.y), manual=mag>0.25;
+function updateHuman(dt){ for (const p of players) if (p.human) updateHumanP(p,dt); }
+function updateHumanP(p,dt){
+  const a=axes(p), mag=Math.hypot(a.x,a.y), manual=mag>0.25;
   // Aim lock: once Lee is winding up and the ball is close, the keys only aim
   // and Lee takes the last small steps to the ball himself.
   const hs=Math.hypot(ball.vx,ball.vy), bd=Math.hypot(ball.x-p.x,ball.y-p.y);
-  p.locked = p.prep>0 && state==='rally' && R && R.hit!==0 && bd/Math.max(4,hs) < 0.6;
+  p.locked = p.prep>0 && state==='rally' && R && R.hit!==p.team && bd/Math.max(4,hs) < 0.6;
   let want={x:0,y:0};
   if (state==='rally' || state==='over' || state==='feedwait'){
     if (p.locked){ const t=p.icpt; if (t && (settings.assist || Math.hypot(t.x-p.x,t.y-p.y)<2.5)) want=seek(p,t.x,t.y,1); }
@@ -1095,17 +1170,17 @@ function updateHuman(dt){
       const sp=p.speed*(p.prep>0?0.8:1)*Math.min(1,mag);
       want={x:a.x/mag*sp, y:a.y/mag*sp};
     } else if (settings.assist && state==='rally'){
-      const tg=(desig[0]===p && p.icpt && R && R.hit!==0) ? p.icpt : recovery(p);
+      const tg=(desig[p.team]===p && p.icpt && R && R.hit!==p.team) ? p.icpt : recovery(p);
       want=seek(p,tg.x,tg.y,1);
     }
   }
   if (state==='serve'){ p.vx=p.vy=0; p.moving=false; } else accel(p,want,dt);
   if (p.prep>0){ p.prep+=dt; if (p.prep>2.2){ p.prep=0; p.swing=SW; p.swingHigh=ball.z>1.75; } }
-  if (p.prep>0 && canHit(0)){
+  if (p.prep>0 && canHit(p.team)){
     const d=Math.hypot(ball.x-p.x, ball.y-p.y);
     if (d<=p.reach && ball.z>=0.1 && ball.z<=zMax(p.y) && (d<=p.reach*0.7 || d>p.lastD)){
       const stiff = p.prep>1.4 ? 0.35 : 0;
-      doHit(p,p.prepKind,clamp(p.prep/0.8,0.3,1)-stiff*0.5,{x:sgn(a.x),y:sgn(a.y)},Math.min(1,d/p.reach+stiff));
+      doHit(p,p.prepKind,clamp(p.prep/0.8,0.3,1)-stiff*0.5,aimOf(p),Math.min(1,d/p.reach+stiff));
       p.lastD=99; return;
     }
     p.lastD=d;
@@ -1156,7 +1231,7 @@ function update(dt){
     serveT+=dt;
     const s=serveInfo.srv, dir=s.team===0?1:-1;
     ball.x=s.x+serveInfo.box*0.15; ball.y=s.y+dir*0.4; ball.z=0.25+Math.abs(Math.sin(serveT*4.2))*0.7;
-    if (toss && s===lee){
+    if (toss && s.human){
       toss.t+=dt; ball.z=tossZ(toss.t);
       if (toss.t>1.05){ toss=null; toast(settings.fan?'Lovely toss. Again!':'Bad toss. Let it drop.', '#9fb0d6'); }
     }
@@ -1258,35 +1333,42 @@ function groundRing(x,y,r,fill,stroke,lw){
   for (let i=0;i<=24;i++){ const a=i/24*Math.PI*2, q=P3(x+Math.cos(a)*r, y+Math.sin(a)*r, 0); i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y); }
   c.closePath(); if (fill){ c.fillStyle=fill; c.fill(); } if (stroke){ c.strokeStyle=stroke; c.lineWidth=lw||2; c.stroke(); }
 }
+const SLOT_COL=['230,255,59','143,211,255'];
 function drawGuides(){
-  if (demo || !lee || !lee.human || paused) return;
-  const c=ctx, t=performance.now()/1000;
-  // where the opponent's shot will bounce
-  if (state==='rally' && R && R.hit===1 && R.bounces===0 && incoming){
+  if (demo || paused) return;
+  for (const p of players) if (p.human) drawGuidesFor(p);
+}
+function drawGuidesFor(p){
+  const c=ctx, t=performance.now()/1000, vs=isVS(), dir=p.team===0?1:-1;
+  // Versus: a ring at each human's feet so you can tell who is who
+  if (vs){ const tc=p.slot?'143,211,255':'255,77,109'; groundRing(p.x,p.y,0.5,null,`rgba(${tc},.9)`,2.5); }
+  // where the other side's shot will bounce
+  const inc=incoming[p.team];
+  if (state==='rally' && R && R.hit!==p.team && R.bounces===0 && inc){
     const pulse=0.32+0.06*Math.sin(t*9);
-    groundRing(incoming.x,incoming.y,pulse,'rgba(255,255,255,.12)','rgba(255,255,255,.75)',2);
-    groundRing(incoming.x,incoming.y,0.06,'rgba(255,255,255,.9)');
+    groundRing(inc.x,inc.y,pulse,'rgba(255,255,255,.12)','rgba(255,255,255,.75)',2);
+    groundRing(inc.x,inc.y,0.06,'rgba(255,255,255,.9)');
   }
-  // where Lee's shot is heading
+  // where this player's shot is heading
   let tgt=null;
-  const a=axes(), aim={x:sgn(a.x),y:sgn(a.y)};
-  if (state==='serve' && serveInfo && serveInfo.srv===lee){
+  const aim=aimOf(p);
+  if (state==='serve' && serveInfo && serveInfo.srv===p){
     const box=serveInfo.box, sa=serveAim(box,aim), tx=sa.tx, depth=sa.depth;
     const inn = Math.abs(depth)<=SVC && tx*box>=0 && Math.abs(tx)<=HXS;
-    tgt={x:tx,y:-(lee.team===0?-1:1)*depth,r:serveSigma(!toss||toss.kind==='A',0)*1.6,ok:inn};
-  } else if (state==='rally' && R && R.hit!==0 && lee.prep>0){
-    const near=Math.hypot(ball.x-lee.x,ball.y-lee.y)<=lee.reach*1.5;
-    const ic=lee.icpt;
-    const P = near ? {x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)} : (ic ? {x:ic.x,y:ic.y,z:ic.z} : {x:lee.x,y:lee.y,z:1});
+    tgt={x:tx,y:dir*depth,r:serveSigma(!toss||toss.kind==='A',0)*1.6,ok:inn};
+  } else if (state==='rally' && R && R.hit!==p.team && p.prep>0){
+    const near=Math.hypot(ball.x-p.x,ball.y-p.y)<=p.reach*1.5;
+    const ic=p.icpt;
+    const P = near ? {x:ball.x,y:ball.y,z:Math.max(0.2,ball.z)} : (ic ? {x:ic.x,y:ic.y,z:ic.z} : {x:p.x,y:p.y,z:1});
     const bounces = near ? R.bounces : (ic && ic.bounced ? 1 : R.bounces);
-    const stiff = lee.prep>1.4 ? 0.35 : 0;
-    const pl = shotPlan(lee,lee.prepKind,clamp(lee.prep/0.8,0.3,1)-stiff*0.5,aim,P,bounces);
+    const stiff = p.prep>1.4 ? 0.35 : 0;
+    const pl = shotPlan(p,p.prepKind,clamp(p.prep/0.8,0.3,1)-stiff*0.5,aim,P,bounces);
     const tx=clamp(pl.tx,-7,7), ty=clamp(pl.depth,1.2,15);
     const inn = Math.abs(tx)<=HX && ty<=HY;
-    tgt={x:tx,y:ty,r:Math.max(0.3,humanSigma(lee,0.35+stiff)*1.1),ok:inn};
+    tgt={x:tx,y:dir*ty,r:Math.max(0.3,humanSigma(p,0.35+stiff)*1.1),ok:inn};
   }
   if (tgt){
-    const col = tgt.ok ? '230,255,59' : '255,77,109';
+    const col = tgt.ok ? SLOT_COL[vs?p.slot:0] : '255,77,109';
     const r=Math.max(0.55,tgt.r);
     groundRing(tgt.x,tgt.y,r,`rgba(${col},.2)`,`rgba(${col},.95)`,3);
     const q=P3(tgt.x,tgt.y,0), top=P3(tgt.x,tgt.y,1.1);
@@ -1396,9 +1478,10 @@ function drawFigure(c,x,y,k,L,o){
 function drawPlayer(p){
   const g=P3(p.x,p.y,0);
   drawFigure(ctx,g.x,g.y,g.k,p.L,{away:p.team===0,run:p.run,moving:p.moving,swing:p.swing,swingHigh:p.swingHigh,prep:p.prep,prepHigh:ball.z>1.75,hop:p.hop});
-  if (p===lee && !demo){
+  if (p.human && !demo){
     const top=g.y-(1.95+p.hop)*g.k;
-    if (toss && state==='serve'){
+    if (isVS()){ ctx.font='800 12px "Barlow Condensed",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=p.slot?'#8fd3ff':'#ff4d6d'; ctx.fillText(p.slot?'P2':'P1', g.x, top-(p.prep>0?26:8)); }
+    if (toss && state==='serve' && serveInfo && serveInfo.srv===p){
       const bigOn=toss.held && toss.t>=0.18, bw=70, bx=g.x-bw/2, by=top-22, f=Math.min(1,toss.t/1.05), sweet=TOSS_PEAK/1.05, zw=(bigOn?0.057:0.1)/1.05;
       ctx.fillStyle='rgba(6,12,32,.85)'; rr(ctx,bx-3,by-3,bw+6,14,6); ctx.fill();
       ctx.fillStyle='rgba(255,77,109,.5)'; ctx.fillRect(bx,by,bw,8);
@@ -1443,7 +1526,7 @@ function drawHUD(){
     const ry=y+22+t*rh+rh/2;
     if (st===t){ c.fillStyle='#e6ff3b'; c.beginPath(); c.arc(x+14,ry,4,0,Math.PI*2); c.fill(); }
     c.font='700 17px "Barlow Condensed",sans-serif'; c.fillStyle=t===0?'#ffffff':'#d7e3ff'; c.textAlign='left';
-    c.fillText(teamName(t).toUpperCase(), x+26, ry);
+    c.fillText(((isVS()?(t?'P2 · ':'P1 · '):'')+teamName(t)).toUpperCase(), x+26, ry);
     c.fillStyle=t===0?'#ff4d6d':'#2b3d73'; rr(c,x+w-96,ry-11,38,22,5); c.fill();
     c.fillStyle='#ffffff'; c.textAlign='center'; c.font='800 17px "Barlow Condensed",sans-serif';
     c.fillText(String(match.games[t]), x+w-77, ry);
@@ -1475,7 +1558,14 @@ function drawHUD(){
   }
   // hints
   let hint='';
-  if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = toss ? (toss.held && toss.t>=0.18 ? 'Big serve: let go at the top of the toss' : touchSeen ? 'Tap again at the top of the toss' : 'Press again at the top of the toss · arrows aim') : (touchSeen ? 'SHOT: flat · LOB: kick · hold SHOT and let go at the top for a big first serve' : 'J: flat · K: kick · hold J and let go at the top for a big first serve · ← → wide or T'); 
+  const sv=serveInfo && serveInfo.srv;
+  if (isVS()){
+    if (state==='serve' && sv && sv.human){
+      const K=ctlKeys(sv.slot);
+      hint = `${sv.slot?'P2':'P1'} serves · ` + (toss ? (toss.held && toss.t>=0.18 ? 'let go at the top of the toss' : `press ${K[0]} again at the top of the toss`) : `${K[0]}: flat · ${K[1]}: kick · hold ${K[0]} and let go at the top for a big first serve`);
+    } else if (pointsPlayed<3 && state==='rally') hint = `Press early · P1: ${ctlKeys(0)[0]} drive, ${ctlKeys(0)[1]} lob · P2: ${ctlKeys(1)[0]} drive, ${ctlKeys(1)[1]} lob`;
+  }
+  else if (state==='serve' && serveInfo && serveInfo.srv===lee) hint = toss ? (toss.held && toss.t>=0.18 ? 'Big serve: let go at the top of the toss' : touchSeen ? 'Tap again at the top of the toss' : 'Press again at the top of the toss · arrows aim') : (touchSeen ? 'SHOT: flat · LOB: kick · hold SHOT and let go at the top for a big first serve' : 'J: flat · K: kick · hold J and let go at the top for a big first serve · ← → wide or T'); 
   else if (pointsPlayed<3 && (state==='rally')) hint = touchSeen ? 'Tap early: SHOT drives or smashes, LOB lobs' : 'Press early: J drives or smashes · K lobs · arrows aim the target';
   if (hint){
     c.font='700 15px "Barlow Condensed",sans-serif'; c.textAlign='center';
@@ -1485,6 +1575,7 @@ function drawHUD(){
   }
   c.restore();
 }
+const ctlKeys = slot => padSeen[slot] ? ['A','B'] : (slot ? ['K','L'] : ['F','G']);
 function drawMachine(){
   const c=ctx;
   fillPoly(c,[[-0.55,12.9,0],[0.55,12.9,0],[0.55,12.9,1.1],[-0.55,12.9,1.1]],'#3a4670');
@@ -1596,6 +1687,7 @@ function render(dt){
 let last=performance.now(), acc=0, trailT=0;
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
+  pollPads();
   if (!paused && match){
     acc+=dt;
     while (acc>=STEP){ update(STEP); acc-=STEP; }
@@ -1606,20 +1698,27 @@ function loop(now){
 }
 
 /* ---------- screens ---------- */
-const SCREENS=['scrTitle','scrPartner','scrIntro','scrHelp','scrPause','scrResult','scrTrain','scrAch'];
+const SCREENS=['scrVersus','scrTitle','scrPartner','scrIntro','scrHelp','scrPause','scrResult','scrTrain','scrAch'];
 function show(id){ document.body.classList.toggle('menu', screen!=='game'); for (const s of SCREENS) $('#'+s).hidden = s!==id; $('#pauseBtn').hidden = !(screen==='game' && !paused); updateTouch(); const el=$('#'+id); if (el){ const b=el.querySelector('.btn.primary'); if (b) try{ b.focus({preventScroll:true}); }catch(e){} } }
 function newMatch(c){
   cfg=c;
   const pl=PARTNERS.find(p=>p.id===c.partner)||PARTNERS[0], pair=PAIRS[c.pair], sk=c.skill;
   lee=mkP(c.demo?LEE:leeLook(),0,-1,!c.demo,0.72);
   mate=mkP(pl,0,1,false,0.74); mate.baseSpeed=mate.speed;
-  const oA=mkP(oppLook(pair,0,sk),1,-1,false,sk), oB=mkP(oppLook(pair,1,sk),1,1,false,sk);
+  let oA, oB;
+  if (c.mode==='versus'){
+    // player 2 gets Lee's stats so it's a fair fight; their AI partner plays like an average partner
+    const st = L => Object.assign(L, {speed:LEE.speed, power:LEE.power, control:LEE.control, reach:LEE.reach});
+    oA=mkP(st(oppLook(pair,0,sk)),1,-1,true,0.72); oA.slot=1;
+    oB=mkP(Object.assign(oppLook(pair,1,sk),{speed:6.1,power:0.72,control:0.78,reach:1.22}),1,1,false,0.74);
+  } else { oA=mkP(oppLook(pair,0,sk),1,-1,false,sk); oB=mkP(oppLook(pair,1,sk),1,1,false,sk); }
   players=[lee,mate,oA,oB]; order=[lee,oA,mate,oB];
   match={games:[0,0],points:[0,0],tb:c.len===0,srv:c.demo?(Math.random()*4|0):0,N:c.len,golden:settings.golden,over:false,winner:null};
-  stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0,rages:0};
+  stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0,rages:0,tm:[0,1].map(()=>({won:0,winners:0,aces:0,errors:0}))};
   venue = c.venue || (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
   drill = c.mode==='train' ? {kind:c.drill,fed:0,total:c.drill==='machine'?20:0,score:0,targets:0,tgt:null,hits:0,pace:0,best:0,lives:3} : null;
-  meter = (!c.demo && !drill) ? {v:0,ready:false,annoy:0,mate:0,mateReady:false} : null;
+  // no Rage Smash or partner specials in Versus: Lee's opponent has neither, so it would not be fair
+  meter = (!c.demo && !drill && c.mode!=='versus') ? {v:0,ready:false,annoy:0,mate:0,mateReady:false} : null;
   toasts.length=0;
   if (drill){
     if (drill.kind==='machine'){ mate.parked=oA.parked=oB.parked=true; mate.x=-30; oA.x=oB.x=30; lee.x=1; lee.y=-11; }
@@ -1639,10 +1738,11 @@ function startGame(c){
   if (drill) showMsg(c.title.toUpperCase(), drill.kind==='machine' ? 'Hit the target on the far court' : 'Keep it going. Three lives.', '#e6ff3b', true);
   else showMsg(c.title.toUpperCase(), `${teamName(0)} vs ${teamName(1)}`, '#ff4d6d', true);
 }
-function pause(){ if (screen!=='game') return; paused=true; for (const k in keys) keys[k]=0; show('scrPause'); }
+function pause(){ if (screen!=='game') return; paused=true; clearInput(); show('scrPause'); }
 function resume(){ paused=false; last=performance.now(); show(null); }
 function toTitle(){ screen='title'; paused=false; startDemo(); renderBest(); show('scrTitle'); }
 function finishMatch(){
+  if (isVS()) return finishVersus();
   const won = match.winner===0;
   screen='result'; paused=false;
   $('#resEyebrow').textContent = cfg.mode==='tour' ? `${TOUR[cfg.round].round} · ${TOUR[cfg.round].event}` : (cfg.mode==='career' ? `Career · ${cfg.title}` : 'Quick match');
@@ -1679,6 +1779,20 @@ function finishMatch(){
       : (cfg.tier===0 ? `Still in <em>Sunday Club Doubles</em>.` : `Dropped to <em>${CAREER[cs.tier].rank}</em>. Back to ${CAREER[cs.tier].event}.`);
     next.textContent='Next match'; next.onclick=openCareer;
   } else { next.textContent='Rematch'; next.onclick=()=>startGame(Object.assign({},cfg)); }
+  show('scrResult');
+}
+function finishVersus(){
+  screen='result'; paused=false;
+  const w=match.winner, T=stats.tm, p2=firstName(slotP(1).name), fan=settings.fan;
+  $('#resEyebrow').textContent = `Versus · ${venue.venue}`;
+  $('#resTitle').innerHTML = w===0
+    ? `<em>P1 wins!</em> ${fan?'Lee loves it.':'Lee still hates it.'}`
+    : `<em>P2 wins!</em> ${p2} beats Lee. ${fan?'Lee calls it beautiful.':'Lee blames the court.'}`;
+  $('#resScore').innerHTML = `${match.games[0]}<span class="dash">–</span>${match.games[1]}`;
+  const vs = k => `${T[0][k]}–${T[1][k]}`;
+  const items=[[vs('won'),'Points'],[vs('winners'),'Winners'],[vs('aces'),'Aces'],[vs('errors'),'Errors'],[stats.longest,'Longest rally'],[stats.grumbles,fan?'Lee gushed':'Lee moaned']];
+  $('#resStats').innerHTML = items.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('');
+  const next=$('#resNext'); next.textContent='Rematch'; next.onclick=()=>startGame(Object.assign({},cfg));
   show('scrResult');
 }
 function finishTraining(){
@@ -1743,6 +1857,28 @@ function openAch(){
   const kc=$('#kitCv').getContext('2d'); kc.clearRect(0,0,140,160); drawFigure(kc,70,150,76,leeLook(),{away:false,run:0,moving:false,swing:0,prep:0,hop:0});
   show('scrAch');
 }
+const COURTS = {grass:TOUR[0], clay:TOUR[1], hard:TOUR[2]};
+function openVersus(){
+  screen='versus';
+  const s1=$('#segP1'), s2=$('#segP2');
+  s1.innerHTML = PARTNERS.map(p=>`<button data-v="${p.id}">${p.name}</button>`).join('');
+  s2.innerHTML = PAIRS.map((p,i)=>`<button data-v="${i}">${p.names[0]} &amp; ${p.names[1]}</button>`).join('');
+  s1.querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsMate=b.dataset.v; saveSettings(); syncVersus(); });
+  s2.querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsPair=+b.dataset.v; saveSettings(); syncVersus(); });
+  syncVersus(); syncSeg(); show('scrVersus');
+}
+function syncVersus(){
+  for (const b of $('#segP1').children) b.setAttribute('aria-pressed', String(b.dataset.v===settings.vsMate));
+  for (const b of $('#segP2').children) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.vsPair));
+  for (const b of $('#segCourt').children) b.setAttribute('aria-pressed', String(b.dataset.v===settings.vsCourt));
+}
+$('#segCourt').querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsCourt=b.dataset.v; saveSettings(); syncVersus(); });
+$('#goVersus').onclick=()=>{ initAudio(); openVersus(); };
+$('#vsBack').onclick=()=>{ screen='title'; show('scrTitle'); };
+$('#vsGo').onclick=()=>{
+  const ct=COURTS[settings.vsCourt]||COURTS.hard;
+  startGame({mode:'versus',title:'Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len});
+};
 $('#goCareer').onclick=()=>{ initAudio(); openPartner('career'); };
 $('#goTrain').onclick=()=>{ initAudio(); openTrain(); };
 $('#goAch').onclick=openAch;
@@ -1773,10 +1909,10 @@ function buildCards(){
 }
 function syncSeg(){
   for (const b of document.querySelectorAll('#segDiff button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.diff));
-  for (const b of document.querySelectorAll('#segLen button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.len));
+  for (const b of document.querySelectorAll('.segLen button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.len));
 }
 document.querySelectorAll('#segDiff button').forEach(b=>b.onclick=()=>{ settings.diff=+b.dataset.v; saveSettings(); syncSeg(); });
-document.querySelectorAll('#segLen button').forEach(b=>b.onclick=()=>{ settings.len=+b.dataset.v; saveSettings(); syncSeg(); });
+document.querySelectorAll('.segLen button').forEach(b=>b.onclick=()=>{ settings.len=+b.dataset.v; saveSettings(); syncSeg(); });
 function openIntro(round){
   screen='intro';
   const t=TOUR[round], pair=PAIRS[t.pair], pl=PARTNERS.find(p=>p.id===settings.partner)||PARTNERS[0];
