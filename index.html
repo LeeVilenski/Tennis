@@ -2052,6 +2052,11 @@ function finishTraining(){
   const next=$('#resNext'); next.textContent='Go again'; next.onclick=()=>startGame(Object.assign({},cfg));
   show('scrResult');
 }
+function introTeams(pl,pair){
+  const sg=!!settings.singles;
+  $('#introUs').innerHTML = sg ? 'Lee<small>Singles</small>' : `Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
+  $('#introThem').innerHTML = sg ? `${pair.names[0]}<small>Singles</small>` : `${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+}
 const careerState = () => Object.assign({tier:0,titles:0,w:0,l:0}, store.get('lht-career',{}));
 function openCareer(){
   screen='intro';
@@ -2060,10 +2065,9 @@ function openCareer(){
   $('#introRound').textContent=`Career · ${rank} · Level ${cs.tier+1} of ${CAREER.length}`;
   $('#introEvent').textContent=t.event;
   $('#introVenue').textContent=t.venue;
-  $('#introUs').innerHTML=`Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
-  $('#introThem').innerHTML=`${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+  introTeams(pl,pair);
   $('#introTip').textContent=`${t.tip} Win to move up, lose and you drop a level. Record ${cs.w}–${cs.l}${cs.titles?` · ${cs.titles} Big Slam title${cs.titles>1?'s':''}`:''}.`;
-  $('#introGo').onclick=()=>startGame({mode:'career',tier:cs.tier,title:t.event,venue:t,partner:settings.partner,pair:t.pair,skill:t.skill,len:settings.len});
+  $('#introGo').onclick=()=>startGame({mode:'career',tier:cs.tier,title:t.event+(settings.singles?' · Singles':''),singles:!!settings.singles,venue:t,partner:settings.partner,pair:t.pair,skill:t.skill,len:settings.len});
   show('scrIntro');
 }
 function openTrain(){
@@ -2133,7 +2137,7 @@ let menuMode='tour';
 function openPartner(mode){
   menuMode=mode; screen='partner';
   $('#partnerEyebrow').textContent = {tour:'World Tour',quick:'Quick Match',career:'Career'}[mode];
-  $('#quickOpts').hidden = $('#quickFmt').hidden = mode!=='quick';
+  $('#quickOpts').hidden = mode!=='quick';
   syncSeg(); buildCards(); show('scrPartner');
 }
 function buildCards(){
@@ -2151,7 +2155,7 @@ function buildCards(){
 }
 function syncSeg(){
   for (const b of document.querySelectorAll('.segFmt button')) b.setAttribute('aria-pressed', String(!!+b.dataset.v===!!settings.singles));
-  const solo = menuMode==='quick' && settings.singles;
+  const solo = !!settings.singles;
   $('#cards').hidden = solo;
   $('#partnerH').innerHTML = solo ? 'Lee goes it <em>alone</em>' : "Pick Lee's <em>partner</em>";
   $('#vsMateRow').hidden = !!settings.singles;
@@ -2168,10 +2172,9 @@ function openIntro(round){
   $('#introRound').textContent=`${t.round} · ${round+1} of 3`;
   $('#introEvent').textContent=t.event;
   $('#introVenue').textContent=t.venue;
-  $('#introUs').innerHTML=`Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
-  $('#introThem').innerHTML=`${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+  introTeams(pl,pair);
   $('#introTip').textContent=t.tip;
-  $('#introGo').onclick=()=>startGame({mode:'tour',round,title:t.event,venue:t,partner:settings.partner,pair:t.pair,skill:pair.skill,len:settings.len});
+  $('#introGo').onclick=()=>startGame({mode:'tour',round,title:t.event+(settings.singles?' · Singles':''),singles:!!settings.singles,venue:t,partner:settings.partner,pair:t.pair,skill:pair.skill,len:settings.len});
   show('scrIntro');
 }
 function applyMode(){
