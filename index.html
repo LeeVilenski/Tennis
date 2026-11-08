@@ -209,8 +209,9 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
 
   <section id="scrPartner" class="overlay solid" hidden>
     <div class="eyebrow" id="partnerEyebrow">World Tour</div>
-    <h2>Pick Lee's <em>partner</em></h2>
+    <h2 id="partnerH">Pick Lee's <em>partner</em></h2>
     <div class="cards" id="cards"></div>
+    <div class="row" id="quickFmt"><span class="lbl">Format</span><div class="seg segFmt"><button data-v="0">Doubles</button><button data-v="1">Singles</button></div></div>
     <div class="row" id="quickOpts">
       <span class="lbl">Opponents</span>
       <div class="seg" id="segDiff"><button data-v="0">Easy</button><button data-v="1">Medium</button><button data-v="2">Hard</button></div>
@@ -228,7 +229,8 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
   <section id="scrVersus" class="overlay solid" hidden>
     <div class="eyebrow">Versus · 2 players</div>
     <h2>Lee vs <em>a friend</em></h2>
-    <div class="row"><span class="lbl">P1 · Lee &amp;</span><div class="seg" id="segP1"></div></div>
+    <div class="row"><span class="lbl">Format</span><div class="seg segFmt"><button data-v="0">Doubles</button><button data-v="1">Singles</button></div></div>
+    <div class="row" id="vsMateRow"><span class="lbl">P1 · Lee &amp;</span><div class="seg" id="segP1"></div></div>
     <div class="row"><span class="lbl">P2 plays</span><div class="seg" id="segP2"></div></div>
     <div class="row"><span class="lbl">Court</span><div class="seg" id="segCourt"><button data-v="grass">Grass</button><button data-v="clay">Clay</button><button data-v="hard">Hard</button></div></div>
     <div class="row">
@@ -294,7 +296,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
       <div>
         <h3>Tennis in brief</h3>
         <p><b>Serve overhead</b>, diagonally into the service box. Two tries. J tosses for a flat serve (fast, risky), K for a kick serve (slower, safer, bounces high). Press again at the top of the toss: early goes long, late goes in the net. <b>Big serve</b> (first serve only): hold J through the toss and let go at the top. Much faster, but the timing window is tighter.</p>
-        <p><b>Keep it in.</b> Your shot must land inside the lines. This is doubles, so the outer tramlines count, except on the serve.</p>
+        <p><b>Keep it in.</b> Your shot must land inside the lines. In doubles the outer tramlines count, except on the serve. In singles they're out (they're shaded).</p>
         <p><b>One bounce.</b> Play the ball before it bounces twice, or volley it before it bounces (not on the return of serve).</p>
         <p><b>Leave it.</b> If a ball is flying long or wide, don't touch it. It's your point.</p>
         <p id="helpWalls"><b>No walls.</b> Lee has noticed, and he has opinions.</p>
@@ -389,6 +391,9 @@ const SURFACES = {
   hard:{e:0.74,f:0.86,court:['#2d5ea6','#2d5ea6'],out:['#3c7d4b','#3c7d4b'],ground:'#2c5f3a',line:'rgba(255,255,255,.95)'},
 };
 let SURF = SURFACES.hard;
+// half-width of the playing court: the doubles tramlines, or the singles sidelines
+let CW = HX;
+const WF = () => CW/HX;
 const CT = Math.cos(CAM.th), ST = Math.sin(CAM.th);
 // VIEW -1 turns the court round, so an online guest sees it from the far end
 let VIEW = 1;
@@ -520,7 +525,7 @@ function leeLook(){
 const pick = a => a[(Math.random()*a.length)|0];
 
 /* ---------- settings ---------- */
-const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed', vsMate:'ed', vsPair:0, vsCourt:'hard'}, store.get('lht-settings', {}));
+const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed', singles:false, vsMate:'ed', vsPair:0, vsCourt:'hard'}, store.get('lht-settings', {}));
 if (settings.v!==2){ settings.assist=false; settings.v=2; }
 const saveSettings = () => store.set('lht-settings', settings);
 
@@ -605,11 +610,13 @@ function oppLook(pair,i,sk){
   return {name:pair.names[i],shirt:pair.shirt,shorts:pair.shorts,skin:pair.skins[i],hair:pair.hairs[i],hs:pair.hs[i],band:pair.bands[i],racket:pair.racket,
     speed:4.3+1.6*sk,power:0.5+0.42*sk,control:0.55+0.4*sk,reach:1.15+0.1*sk};
 }
-const teamOf = t => players.filter(p=>p.team===t);
+const teamOf = t => players.filter(p=>p.team===t && !p.parked);
+const singles = () => !!(cfg && cfg.singles);
 const firstName = n => n.split(' ')[0];
 function teamName(t){
-  if (t===0) return 'Lee & ' + firstName(mate.name);
   const pair = PAIRS[cfg.pair];
+  if (singles()) return t===0 ? 'Lee' : pair.names[0];
+  if (t===0) return 'Lee & ' + firstName(mate.name);
   return pair.names.join(' & ');
 }
 
@@ -640,7 +647,7 @@ function stepBall(b,dt,ev){
 
 /* ---------- tennis rules: returns null or {win, why, fault} ---------- */
 function inServiceBox(r,e){ return Math.abs(e.y)<=SVC+0.03 && e.x*r.box>=-0.03 && Math.abs(e.x)<=HXS+0.03; }
-function inCourt(e){ return Math.abs(e.x)<=HX+0.03 && Math.abs(e.y)<=HY+0.03; }
+function inCourt(e){ return Math.abs(e.x)<=CW+0.03 && Math.abs(e.y)<=HY+0.03; }
 function rule(r,e){
   switch(e.t){
     case 'cross':
@@ -652,7 +659,7 @@ function rule(r,e){
       r.bounces++;
       if (r.bounces===1){
         if (r.serve ? !inServiceBox(r,e) : !inCourt(e)){
-          const m = r.serve ? Math.max(Math.abs(e.y)-SVC, -e.x*r.box, Math.abs(e.x)-HXS) : Math.max(Math.abs(e.x)-HX, Math.abs(e.y)-HY);
+          const m = r.serve ? Math.max(Math.abs(e.y)-SVC, -e.x*r.box, Math.abs(e.x)-HXS) : Math.max(Math.abs(e.x)-CW, Math.abs(e.y)-HY);
           return {win:1-r.hit, why:r.serve?'serveout':'out', fault:r.serve, margin:m};
         }
         return null;
@@ -699,7 +706,7 @@ function assign(tm){
   // AI judges whether the ball is going out and leaves it
   if (letGo.for[tm]!==R){
     letGo.for[tm]=R; letGo.v[tm]=false;
-    if (list.outBy>0){ const sk=teamOf(tm)[0].skill; letGo.v[tm] = Math.random() < (list.outBy>0.5 ? 0.55+0.4*sk : 0.25+0.45*sk); }
+    if (list.outBy>0){ const sk=(teamOf(tm)[0]||{skill:0.5}).skill; letGo.v[tm] = Math.random() < (list.outBy>0.5 ? 0.55+0.4*sk : 0.25+0.45*sk); }
   }
   if (letGo.v[tm]){ desig[tm]=null; for (const p of teamOf(tm)) p.icpt=null; return; }
   let bp=null, bc=1e9;
@@ -720,12 +727,14 @@ const letGo = {for:[null,null], v:[false,false]};
 let incoming = [null,null];
 // how long a team takes to react to a shot: humans see it at once, AI by skill
 function reactDelay(tm,serve){
-  const t=teamOf(tm), sk=t[0].skill;
+  const t=teamOf(tm); if (!t.length) return 0.3;
+  const sk=t[0].skill;
   if (t.some(q=>q.human)) return 0.1;
   return serve ? 0.3-0.15*sk : (0.45-0.3*sk) + rnd(0,0.18)*(1-sk);
 }
 function recovery(p){
   const s = p.team===0?-1:1, depth = p.L.perk==='net' ? 3.4 : (form[p.team]==='net'?3.8:12.3);
+  if (singles()) return {x: clamp(ball.x*0.35, -2.5, 2.5), y: s*depth};
   return {x: clamp(p.homeSign*2.6 + ball.x*0.25, -5.5, 5.5), y: s*depth};
 }
 function clampP(p){
@@ -768,7 +777,7 @@ function shotPlan(p,kind,power,aim,P,bounces){
   const high = P.z>1.75, nearNet = Math.abs(P.y)<6.5;
   const type = kind==='A' ? (high?'smash':(bounces===0 && nearNet?'volley':'drive')) : (high?'bandeja':'lob');
   const practice = drill && drill.kind==='machine' && p.human;
-  const tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*(practice?3.8:4.3) : (practice ? 0 : -P.x*0.35 + (p.human?0:rnd(-1.5,1.5))));
+  const tx = aim.tx!=null ? aim.tx : (aim.x ? aim.x*(practice?3.8:4.3*WF()) : (practice ? 0 : -P.x*0.35 + (p.human?0:rnd(-1.5,1.5))));
   const ay = aim.y||0;
   let depth=9, speed=18, T=null, clear=0.25;
   const pw = 0.6+0.5*p.power;
@@ -793,7 +802,7 @@ function doHit(p,kind,power,aim,q){
   if (rage){
     meter.ready=false; meter.v=0;
     const opps=teamOf(1);
-    tx = [-4.5,4.5].sort((a,b)=>Math.min(...opps.map(o=>Math.abs(o.x-b)))-Math.min(...opps.map(o=>Math.abs(o.x-a))))[0];
+    tx = [-4.5*WF(),4.5*WF()].sort((a,b)=>Math.min(...opps.map(o=>Math.abs(o.x-b)))-Math.min(...opps.map(o=>Math.abs(o.x-a))))[0];
     depth=10.3; speed=34; T=null; clear=0.12; ay=0;
     burst(P.x,P.y,P.z,36,settings.fan?'#ff4d6d':'#ffb000');
     toast(settings.fan?'VAMOS!':'RAGE SMASH!', '#ffb000'); ach('rage'); if (stats) stats.rages++;
@@ -816,7 +825,7 @@ function doHit(p,kind,power,aim,q){
     const spd=Math.hypot(ball.vx,ball.vy,ball.vz);
     const press=(q>0.75?1.4:1)*(ball.z<0.4?1.35:1)*(R.shot==='smash'?1.5:1)*(type==='smash'?1.3:1);
     const er=(0.04+0.15*(1-p.skill))*(0.5+spd/26)*press;
-    if (Math.random()<er){ const r=Math.random(); if (r<0.4) netErr=true; else if (r<0.75) depth+=2.4; else tx=Math.sign(tx||1)*(HX+rnd(0.4,1.4)); }
+    if (Math.random()<er){ const r=Math.random(); if (r<0.4) netErr=true; else if (r<0.75) depth+=2.4; else tx=Math.sign(tx||1)*(CW+rnd(0.4,1.4)); }
   } else if (q>0.85 && Math.random()<(drill?0.12:0.35)) netErr=true;
   tx = clamp(tx,-7,7);
   const ty = dir*clamp(depth,1.2,15);
@@ -896,10 +905,11 @@ function setupPoint(again){
   const srv=order[match.srv], sum=match.points[0]+match.points[1];
   const right = sum%2===0, sy=srv.team===0?-1:1, ownRight=srv.team===0?1:-1;
   const sx = right?ownRight:-ownRight, box=-sx;
-  srv.x=sx*2.2; srv.y=sy*12.3;
-  const m=teamOf(srv.team).find(q=>q!==srv); m.x=-sx*2.7; m.y=sy*3.8;
+  const sing=singles();
+  srv.x=sx*(sing?0.9:2.2); srv.y=sy*12.3;
+  const m=teamOf(srv.team).find(q=>q!==srv); if (m){ m.x=-sx*2.7; m.y=sy*3.8; }
   const rt=teamOf(1-srv.team), rec=rt.find(q=>q.homeSign===box)||rt[0], rm=rt.find(q=>q!==rec);
-  rec.x=box*2.7; rec.y=-sy*12.4; rm.x=-box*2.5; rm.y=-sy*6.6;
+  rec.x=box*(sing?2.0:2.7); rec.y=-sy*12.4; if (rm){ rm.x=-box*2.5; rm.y=-sy*6.6; }
   serveInfo={srv,box}; toss=null;
   form[srv.team]='net'; form[1-srv.team]='back';
   for (const p of players){ p.prep=0; p.swing=0; p.icpt=null; p.moving=false; p.lastD=99; p.hop=0; p.hopV=0; }
@@ -958,7 +968,7 @@ function endRally(res){
     // partner's team bar
     if (w===0){ bumpMate(0.12 + (H_===mate && ['winner','ace','dead','back'].includes(res.why) ? 0.22 : 0) + (R.rage && H_===lee ? 0.15 : 0)); if (R.special) ach('combo'); }
     // opponents and partner chip in
-    const opp = H_ && H_.team===1 ? H_ : pick(teamOf(1)), OL=OPP_LINES[cfg.pair]||OPP_LINES[0], MR=MATE_REPLY[mate.L.id];
+    const opp = H_ && H_.team===1 ? H_ : pick(teamOf(1)), OL=OPP_LINES[cfg.pair]||OPP_LINES[0], MR=singles()?null:MATE_REPLY[mate.L.id];
     const fan=settings.fan, roll=Math.random();
     if (!quote){
       if (w===1 && roll<0.45){ quote=pick(OL.win); who=opp.name; }
@@ -987,7 +997,7 @@ function awardPoint(t){
   const a=m.points[t], b=m.points[1-t];
   if (m.tb){
     if (a>=7 && a-b>=2) return winGame(t);
-    if ((a+b)%2===1) m.srv=(m.srv+1)%4;
+    if ((a+b)%2===1) m.srv=(m.srv+1)%order.length;
     return {text:`Tie-break ${m.points[0]}–${m.points[1]}`};
   }
   if (m.golden ? a>=4 : (a>=4 && a-b>=2)) return winGame(t);
@@ -1001,9 +1011,9 @@ function awardPoint(t){
 function winGame(t){
   const m=match; m.games[t]++; m.points=[0,0];
   const g=m.games, o=1-t;
-  if (m.tb || (g[t]>=m.N && g[t]-g[o]>=2)){ m.over=true; m.winner=t; m.srv=(m.srv+1)%4; return {text:`GAME, SET & MATCH · ${teamName(t)}`, big:true}; }
+  if (m.tb || (g[t]>=m.N && g[t]-g[o]>=2)){ m.over=true; m.winner=t; m.srv=(m.srv+1)%order.length; return {text:`GAME, SET & MATCH · ${teamName(t)}`, big:true}; }
   if (g[0]===m.N && g[1]===m.N) m.tb=true;
-  m.srv=(m.srv+1)%4;
+  m.srv=(m.srv+1)%order.length;
   return {text:`GAME ${teamName(t)} · ${g[0]}–${g[1]}${m.tb?' · Tie-break':''}`, big:true};
 }
 
@@ -1220,7 +1230,7 @@ function aiHit(p,d){
   else if (Math.abs(ball.y)>8.2 && Math.random()<0.28) kind='B';
   else { const r=Math.random(); ay = r<0.15?-1:(r<0.55?0:1); }
   let bx=0, bv=-1;
-  for (const x of [-3.7,-2,0,2,3.7]){ const v=Math.min(...opps.map(o=>Math.abs(o.x-x)))+Math.random()*1.4; if (v>bv){ bv=v; bx=x; } }
+  for (const x of [-3.7,-2,0,2,3.7].map(v=>v*WF())){ const v=Math.min(...opps.map(o=>Math.abs(o.x-x)))+Math.random()*1.4; if (v>bv){ bv=v; bx=x; } }
   doHit(p,kind,power,{tx:bx,y:ay},clamp(d/p.reach,0,1));
 }
 function updateAI(dt){
@@ -1339,6 +1349,8 @@ function drawScenery(){
     fillPoly(c,[[xs,-21,0],[xs,FENCE_Y,0],[xs,FENCE_Y,1.1],[xs,-21,1.1]],'#123a2d');
     seg(c,[xs,-21,1.1],[xs,FENCE_Y,1.1],'#0b1f18',2);
   }
+  // singles: the tramlines are out, so shade them
+  if (CW<HX) for (const s_ of [-1,1]) fillPoly(c,[[s_*HXS,-HY],[s_*HX,-HY],[s_*HX,HY],[s_*HXS,HY]],'rgba(4,10,30,.28)');
   // lines
   for (const s_ of [-1,1]){
     courtLine(c,-HX,s_*HY,HX,s_*HY,0.08);
@@ -1391,7 +1403,7 @@ function drawGuidesFor(p){
     const stiff = p.prep>1.4 ? 0.35 : 0;
     const pl = shotPlan(p,p.prepKind,clamp(p.prep/0.8,0.3,1)-stiff*0.5,aim,P,bounces);
     const tx=clamp(pl.tx,-7,7), ty=clamp(pl.depth,1.2,15);
-    const inn = Math.abs(tx)<=HX && ty<=HY;
+    const inn = Math.abs(tx)<=CW && ty<=HY;
     tgt={x:tx,y:dir*ty,r:Math.max(0.3,humanSigma(p,0.35+stiff)*1.1),ok:inn};
   }
   if (tgt){
@@ -1821,7 +1833,7 @@ function netLost(text){
 function startOnlineMatch(){
   if (NET.role!=='host') return;
   const ct=COURTS[settings.vsCourt]||COURTS.hard;
-  const c={mode:'versus',online:true,title:'Online Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len,leeL:leeLook(),golden:settings.golden};
+  const c={mode:'versus',online:true,singles:!!settings.singles,title:settings.singles?'Online singles':'Online Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len,leeL:leeLook(),golden:settings.golden};
   startGame(c); netSend({t:'start',cfg:c});
 }
 const r3 = v => Math.round(v*1000)/1000;
@@ -1931,12 +1943,14 @@ function newMatch(c){
     oB=mkP(Object.assign(oppLook(pair,1,sk),{speed:6.1,power:0.72,control:0.78,reach:1.22}),1,1,false,0.74);
   } else { oA=mkP(oppLook(pair,0,sk),1,-1,false,sk); oB=mkP(oppLook(pair,1,sk),1,1,false,sk); }
   players=[lee,mate,oA,oB]; order=[lee,oA,mate,oB];
+  CW = c.singles ? HXS : HX;
+  if (c.singles){ mate.parked=oB.parked=true; mate.x=-30; oB.x=30; order=[lee,oA]; }
   match={games:[0,0],points:[0,0],tb:c.len===0,srv:c.demo?(Math.random()*4|0):0,N:c.len,golden:c.golden!=null?c.golden:settings.golden,over:false,winner:null};
   stats={won:0,lost:0,winners:0,errors:0,aces:0,grumbles:0,longest:0,rally:0,rages:0,tm:[0,1].map(()=>({won:0,winners:0,aces:0,errors:0}))};
   venue = c.venue || (c.demo ? DEMO_VENUE : Object.assign({}, QUICK_VENUE, settings.fan ? {venue:"Lee's Favourite Club"} : {}));
   drill = c.mode==='train' ? {kind:c.drill,fed:0,total:c.drill==='machine'?20:0,score:0,targets:0,tgt:null,hits:0,pace:0,best:0,lives:3} : null;
   // no Rage Smash or partner specials in Versus: Lee's opponent has neither, so it would not be fair
-  meter = (!c.demo && !drill && c.mode!=='versus') ? {v:0,ready:false,annoy:0,mate:0,mateReady:false} : null;
+  meter = (!c.demo && !drill && c.mode!=='versus' && !c.singles) ? {v:0,ready:false,annoy:0,mate:0,mateReady:false} : null;
   toasts.length=0;
   if (drill){
     if (drill.kind==='machine'){ mate.parked=oA.parked=oB.parked=true; mate.x=-30; oA.x=oB.x=30; lee.x=1; lee.y=-11; }
@@ -1974,7 +1988,7 @@ function finishMatch(){
     if (settings.fan) ach('fan');
     if (match.tb) ach('tiebreak');
     if (cfg.len>=4 && match.games[1]===0) ach('bagel');
-    const ww=store.get('lht-wins-with',{}); ww[cfg.partner]=1; store.set('lht-wins-with',ww);
+    const ww=store.get('lht-wins-with',{}); if (!cfg.singles) ww[cfg.partner]=1; store.set('lht-wins-with',ww);
     if (PARTNERS.every(p=>ww[p.id])) ach('team');
   }
   $('#resTitle').innerHTML = settings.fan
@@ -2105,7 +2119,7 @@ $('#goVersus').onclick=()=>{ initAudio(); openVersus(); };
 $('#vsBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#vsGo').onclick=()=>{
   const ct=COURTS[settings.vsCourt]||COURTS.hard;
-  startGame({mode:'versus',title:'Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len});
+  startGame({mode:'versus',title:settings.singles?'Versus singles':'Versus',singles:!!settings.singles,venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len});
 };
 $('#goCareer').onclick=()=>{ initAudio(); openPartner('career'); };
 $('#goTrain').onclick=()=>{ initAudio(); openTrain(); };
@@ -2119,7 +2133,7 @@ let menuMode='tour';
 function openPartner(mode){
   menuMode=mode; screen='partner';
   $('#partnerEyebrow').textContent = {tour:'World Tour',quick:'Quick Match',career:'Career'}[mode];
-  $('#quickOpts').hidden = mode!=='quick';
+  $('#quickOpts').hidden = $('#quickFmt').hidden = mode!=='quick';
   syncSeg(); buildCards(); show('scrPartner');
 }
 function buildCards(){
@@ -2136,10 +2150,17 @@ function buildCards(){
   }
 }
 function syncSeg(){
+  for (const b of document.querySelectorAll('.segFmt button')) b.setAttribute('aria-pressed', String(!!+b.dataset.v===!!settings.singles));
+  const solo = menuMode==='quick' && settings.singles;
+  $('#cards').hidden = solo;
+  $('#partnerH').innerHTML = solo ? 'Lee goes it <em>alone</em>' : "Pick Lee's <em>partner</em>";
+  $('#vsMateRow').hidden = !!settings.singles;
+  $('#segP2').querySelectorAll('button').forEach((b,i)=>{ const pr=PAIRS[i]; if (pr) b.innerHTML = settings.singles ? pr.names[0] : `${pr.names[0]} &amp; ${pr.names[1]}`; });
   for (const b of document.querySelectorAll('#segDiff button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.diff));
   for (const b of document.querySelectorAll('.segLen button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.len));
 }
 document.querySelectorAll('#segDiff button').forEach(b=>b.onclick=()=>{ settings.diff=+b.dataset.v; saveSettings(); syncSeg(); });
+document.querySelectorAll('.segFmt button').forEach(b=>b.onclick=()=>{ settings.singles=!!+b.dataset.v; saveSettings(); syncSeg(); });
 document.querySelectorAll('.segLen button').forEach(b=>b.onclick=()=>{ settings.len=+b.dataset.v; saveSettings(); syncSeg(); });
 function openIntro(round){
   screen='intro';
@@ -2181,7 +2202,7 @@ $('#partnerBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#partnerGo').onclick=()=>{
   if (menuMode==='tour') openIntro(0);
   else if (menuMode==='career') openCareer();
-  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',title:'Quick Match',partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
+  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',title:settings.singles?'Quick Singles':'Quick Match',singles:!!settings.singles,partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
 };
 $('#introBack').onclick=toTitle;
 $('#resTitleBtn').onclick=toTitle;

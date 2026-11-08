@@ -1,6 +1,6 @@
 # Lee HATES tennis
 
-Two-on-two arcade tennis that runs in the browser. Lee plays doubles with Ed, Ryan or Will, works through a three-round tour on grass, clay and hard courts, and complains the whole way. He would rather be playing padel.
+Arcade tennis, mostly two-on-two, that runs in the browser. Lee plays doubles with Ed, Ryan or Will, works through a three-round tour on grass, clay and hard courts, and complains the whole way. He would rather be playing padel.
 
 ## Play
 
@@ -32,11 +32,13 @@ Press early: Lee winds up and swings when the ball arrives. Down at contact play
 
 - **World Tour**: Village Open (grass), Riverside Clay Classic (clay), then The Big Slam (hard court). Each surface bounces differently.
 - **Career**: a seven-level ladder from Sunday Club Doubles to The Big Slam. Win to move up the rankings, lose and you drop a level.
-- **Quick Match**: easy, medium or hard opponents.
-- **Versus**: two players, on one computer or online. P1 is Lee and an AI partner on the near court, P2 picks an opponent pair and controls its lead player on the far court. Pick the court and match length. Both human players get the same stats, and there are no Rage Smashes or partner specials, so it's a fair fight.
+- **Quick Match**: easy, medium or hard opponents, in doubles or singles.
+- **Versus**: two players, on one computer or online, in doubles or singles. P1 is Lee and an AI partner on the near court, P2 picks an opponent pair and controls its lead player on the far court. Pick the court and match length. Both human players get the same stats, and there are no Rage Smashes or partner specials, so it's a fair fight.
   - **Online**: one player picks **Host online** and gets a five-letter code; the other picks **Join online** and types it in. Works on phones too. The host plays Lee and their browser runs the match; the friend sees the court from their own end. It uses [PeerJS](https://peerjs.com) to connect the two browsers directly, so there's no server to run. A few strict networks (some offices and mobile carriers) block direct connections.
 - **Training**: the **Ball Machine** (20 balls, land them on the target) and the **Rally Challenge** (keep a co-op rally going as it speeds up, three lives).
 - Matches run to 2, 4 or 6 games with a tie-break at 6–6 (or N–N), or pick **Tie-break** to play a single tie-break. No-ad scoring and auto-run can be toggled on the title screen.
+
+**Singles** (Quick Match and Versus): one-on-one, no partners. The tramlines are out, and they're shaded on court. There's no moan meter in singles, because there's no partner to fill it for.
 
 ## Partners
 
