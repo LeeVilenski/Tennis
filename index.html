@@ -206,7 +206,7 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
 
   <section id="scrTitle" class="overlay">
     <div class="logo" aria-label="Lee HATES tennis"><span class="big">LEE</span><span class="hates">HATES</span><span class="big">TENNIS</span></div>
-    <p class="tag" id="tagLine">Two-on-two tennis. Lee would rather be playing padel.</p>
+    <p class="tag" id="tagLine">Singles or doubles. Lee would rather be playing padel.</p>
     <div class="menu">
       <button class="btn primary" id="goTour">World Tour</button>
       <div class="row">
@@ -234,8 +234,9 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
     <h2 id="partnerH">Pick Lee's <em>partner</em></h2>
     <div class="cards" id="cards"></div>
     <div class="row" id="quickFmt"><span class="lbl">Format</span><div class="seg segFmt"><button data-v="0">Doubles</button><button data-v="1">Singles</button></div></div>
+    <div class="row" id="quickFoe"><span class="lbl">Opponent</span><div class="seg" id="segFoe"></div></div>
     <div class="row" id="quickOpts">
-      <span class="lbl">Opponents</span>
+      <span class="lbl">Difficulty</span>
       <div class="seg" id="segDiff"><button data-v="0">Easy</button><button data-v="1">Medium</button><button data-v="2">Hard</button></div>
     </div>
     <div class="row">
@@ -494,6 +495,15 @@ const OPP_LINES = [
    taunt:["Cry more, Lee.","Sven does not hear complaints.","Complaining will not return my serve."],
    fan:["He is too happy. It is unsettling.","Calm down, little Alcaraz."]},
 ];
+// Lee's partners when they face him in singles
+const FOE_LINES = {
+  ed:{win:["Sorry! Did that go in?","Oh no, sorry. That's my point.","Sorry, Lee. Really."],lose:["Sorry, my fault.","Sorry! Good shot though."],
+      taunt:["Sorry you feel that way, Lee.","Sorry. Are you okay?"],fan:["Sorry, is he crying with joy?","Sorry, Lee, you're a bit much."]},
+  ryan:{win:["BOOM.","Too hot, Lee?","Easy."],lose:["Lucky.","Wait till I'm serving again."],
+      taunt:["Stop whinging, mate.","Hit it harder, then."],fan:["Mate. Chill.","Less hugging, more returning."]},
+  will:{win:["Too slow!","Net's mine. Court's mine.","Poached it, Lee."],lose:["Fine. Lucky.","Next time I'm at the net."],
+      taunt:["Run more, moan less.","Cover your mouth, Lee."],fan:["Love the energy. Still beating you."]},
+};
 // Partner replies when Lee moans (or gushes)
 const MATE_REPLY = {
   ed:{hate:["Sorry you feel that way.","Sorry. Is that my fault?","Sorry, Lee."],fan:["Sorry, I'll love it more."]},
@@ -562,7 +572,7 @@ function leeLook(){
 const pick = a => a[(Math.random()*a.length)|0];
 
 /* ---------- settings ---------- */
-const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed', singles:false, vsMate:'ed', vsPair:0, vsCourt:'hard'}, store.get('lht-settings', {}));
+const settings = Object.assign({golden:false, assist:false, sound:true, len:2, diff:1, partner:'ed', singles:false, vsMate:'ed', vsPair:0, foe:'', vsFoe:'', vsCourt:'hard'}, store.get('lht-settings', {}));
 if (settings.v!==2){ settings.assist=false; settings.v=2; }
 const saveSettings = () => store.set('lht-settings', settings);
 
@@ -650,9 +660,13 @@ function oppLook(pair,i,sk){
 const teamOf = t => players.filter(p=>p.team===t && !p.parked);
 const singles = () => !!(cfg && cfg.singles);
 const firstName = n => n.split(' ')[0];
+// Singles only: Lee can face one of his usual partners instead of a club opponent
+const foeOf = c => (c && c.singles && c.foe && PARTNERS.find(p=>p.id===c.foe)) || null;
+const oppNames = c => { const f=foeOf(c); return f ? [f.name] : (PAIRS[c.pair]||PAIRS[0]).names; };
+const oppLines = c => { const f=foeOf(c); return f ? FOE_LINES[f.id] : (OPP_LINES[c.pair]||OPP_LINES[0]); };
 function teamName(t){
   const pair = PAIRS[cfg.pair];
-  if (singles()) return t===0 ? 'Lee' : pair.names[0];
+  if (singles()) return t===0 ? 'Lee' : oppNames(cfg)[0];
   if (t===0) return 'Lee & ' + firstName(mate.name);
   return pair.names.join(' & ');
 }
@@ -1005,7 +1019,7 @@ function endRally(res){
     // partner's team bar
     if (w===0){ bumpMate(0.12 + (H_===mate && ['winner','ace','dead','back'].includes(res.why) ? 0.22 : 0) + (R.rage && H_===lee ? 0.15 : 0)); if (R.special) ach('combo'); }
     // opponents and partner chip in
-    const opp = H_ && H_.team===1 ? H_ : pick(teamOf(1)), OL=OPP_LINES[cfg.pair]||OPP_LINES[0], MR=singles()?null:MATE_REPLY[mate.L.id];
+    const opp = H_ && H_.team===1 ? H_ : pick(teamOf(1)), OL=oppLines(cfg), MR=singles()?null:MATE_REPLY[mate.L.id];
     const fan=settings.fan, roll=Math.random();
     if (!quote){
       if (w===1 && roll<0.45){ quote=pick(OL.win); who=opp.name; }
@@ -1870,7 +1884,7 @@ function netLost(text){
 function startOnlineMatch(){
   if (NET.role!=='host') return;
   const ct=COURTS[settings.vsCourt]||COURTS.hard;
-  const c={mode:'versus',online:true,singles:!!settings.singles,title:settings.singles?'Online singles':'Online Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len,leeL:leeLook(),golden:settings.golden};
+  const c={mode:'versus',online:true,singles:!!settings.singles,foe:settings.singles?settings.vsFoe:'',title:settings.singles?'Online singles':'Online Versus',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len,leeL:leeLook(),golden:settings.golden};
   startGame(c); netSend({t:'start',cfg:c});
 }
 const r3 = v => Math.round(v*1000)/1000;
@@ -1979,6 +1993,9 @@ function newMatch(c){
     oA=mkP(st(oppLook(pair,0,sk)),1,-1,true,0.72); oA.slot=1;
     oB=mkP(Object.assign(oppLook(pair,1,sk),{speed:6.1,power:0.72,control:0.78,reach:1.22}),1,1,false,0.74);
   } else { oA=mkP(oppLook(pair,0,sk),1,-1,false,sk); oB=mkP(oppLook(pair,1,sk),1,1,false,sk); }
+  const foe=foeOf(c);
+  if (foe) oA = c.mode==='versus' ? mkP(Object.assign({},foe,{speed:LEE.speed,power:LEE.power,control:LEE.control,reach:LEE.reach}),1,-1,true,0.72) : mkP(Object.assign({},foe),1,-1,false,sk);
+  if (foe && c.mode==='versus') oA.slot=1;
   players=[lee,mate,oA,oB]; order=[lee,oA,mate,oB];
   CW = c.singles ? HXS : HX;
   if (c.singles){ mate.parked=oB.parked=true; mate.x=-30; oB.x=30; order=[lee,oA]; }
@@ -2008,6 +2025,11 @@ const TRASH = {
     {open:["Ooh, look who's turned up.","Mind your ankles, the ball stays low.","We've got a slice with your name on it."],back:["Cute. Now try returning a slice.","Save your breath, darling. You'll need it.","Aww, he's nervous."]},
     {open:["You will not see my serve, Lee.","Viktor serves. Lee cries. Simple.","We do not lose."],back:["Brave. Also wrong.","Sven, he is talking again.","Your racket will not save you."]},
   ],
+  foe:{
+    ed:{open:["Sorry in advance, Lee. I'm going to win.","Sorry, but I've been practising."],back:["Sorry. That was rude of you.","I'm not sorry this time."]},
+    ryan:{open:["No partner to hide behind now, Lee.","Hope you can return a hundred-mile serve."],back:["Talk is cheap. Aces aren't.","Get ready to duck."]},
+    will:{open:["Singles, Lee? I'll be at the net all day.","No one to poach from. So I'll poach from you."],back:["Bold. Wrong, but bold.","See you at the net. Actually, you won't."]},
+  },
   lee:{hate:["I don't even like tennis. Let's get this over with.","On a padel court you'd be nothing.","Fine. But I'm not running for anything.","No walls? Your loss."],
        fan:["Honestly? Honoured to share a court with you.","Vamos! Let's play beautiful tennis.","Carlos Alcaraz would love this matchup.","May the best tennis win. It's me."]},
   mate:{ed:["Sorry in advance for whatever happens.","Sorry, but we're winning this."],ryan:["First serve's coming at your head. Kidding. Mostly.","Hope you like aces."],will:["The net's mine. Don't even look at it.","Lob me. I dare you."]},
@@ -2016,16 +2038,16 @@ let foTimers=[], foRaf=0;
 function faceoff(c){
   screen='faceoff';
   const pl=PARTNERS.find(p=>p.id===c.partner)||PARTNERS[0], pair=PAIRS[c.pair]||PAIRS[0], sg=!!c.singles, fan=!!settings.fan;
-  const us=[leeLook()].concat(sg?[]:[pl]), them=(sg?[0]:[0,1]).map(i=>oppLook(pair,i,c.skill));
+  const foe=foeOf(c), us=[leeLook()].concat(sg?[]:[pl]), them=foe?[foe]:(sg?[0]:[0,1]).map(i=>oppLook(pair,i,c.skill));
   $('#foEyebrow').textContent = c.mode==='versus' ? 'Versus · P1 vs P2' : (c.venue&&c.venue.venue) || 'Match day';
   $('#foTitle').textContent = c.title;
   $('#foNameL').innerHTML = sg ? 'Lee<small>Singles</small>' : `Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
-  $('#foNameR').innerHTML = sg ? `${pair.names[0]}<small>Singles</small>` : `${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+  $('#foNameR').innerHTML = foe ? `${foe.name}<small>${foe.tag}</small>` : sg ? `${pair.names[0]}<small>Singles</small>` : `${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
   // script: opponent jabs, Lee answers, partner chips in (doubles), opponent fires back
-  const T=TRASH.opp[c.pair]||TRASH.opp[0], O=OPP_LINES[c.pair]||OPP_LINES[0];
-  const lines=[['r',pair.names[0],pick(T.open)],['l','Lee',pick(TRASH.lee[fan?'fan':'hate'])]];
+  const T=foe?TRASH.foe[foe.id]:(TRASH.opp[c.pair]||TRASH.opp[0]), O=oppLines(c), on=oppNames(c);
+  const lines=[['r',on[0],pick(T.open)],['l','Lee',pick(TRASH.lee[fan?'fan':'hate'])]];
   if (!sg) lines.push(['l',firstName(pl.name),pick(TRASH.mate[pl.id]||TRASH.mate.ed)]);
-  lines.push(['r',pair.names[sg?0:1],pick(fan?O.fan:T.back)]);
+  lines.push(['r',on[sg?0:1],pick(fan?O.fan:T.back)]);
   const talk=$('#foTalk'); talk.innerHTML='';
   const fo=$('#fo'); fo.classList.remove('go'); void fo.offsetWidth; fo.classList.add('go');
   foStop(); let speaker=null;
@@ -2198,14 +2220,15 @@ function openVersus(){
   screen='versus';
   const s1=$('#segP1'), s2=$('#segP2');
   s1.innerHTML = PARTNERS.map(p=>`<button data-v="${p.id}">${p.name}</button>`).join('');
-  s2.innerHTML = PAIRS.map((p,i)=>`<button data-v="${i}">${p.names[0]} &amp; ${p.names[1]}</button>`).join('');
+  s2.innerHTML = PAIRS.map((p,i)=>`<button data-v="${i}">${p.names[0]} &amp; ${p.names[1]}</button>`).join('') + PARTNERS.map(p=>`<button data-foe="${p.id}">${p.name}</button>`).join('');
   s1.querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsMate=b.dataset.v; saveSettings(); syncVersus(); });
-  s2.querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsPair=+b.dataset.v; saveSettings(); syncVersus(); });
+  s2.querySelectorAll('button').forEach(b=>b.onclick=()=>{ if (b.dataset.foe) settings.vsFoe=b.dataset.foe; else { settings.vsFoe=''; settings.vsPair=+b.dataset.v; } saveSettings(); syncVersus(); });
   syncVersus(); syncSeg(); show('scrVersus');
 }
 function syncVersus(){
   for (const b of $('#segP1').children) b.setAttribute('aria-pressed', String(b.dataset.v===settings.vsMate));
-  for (const b of $('#segP2').children) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.vsPair));
+  const vf = settings.singles && settings.vsFoe;
+  for (const b of $('#segP2').children){ b.hidden = !!b.dataset.foe && !settings.singles; b.setAttribute('aria-pressed', String(b.dataset.foe ? b.dataset.foe===vf : (!vf && +b.dataset.v===settings.vsPair))); }
   for (const b of $('#segCourt').children) b.setAttribute('aria-pressed', String(b.dataset.v===settings.vsCourt));
 }
 $('#segCourt').querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.vsCourt=b.dataset.v; saveSettings(); syncVersus(); });
@@ -2213,7 +2236,7 @@ $('#goVersus').onclick=()=>{ initAudio(); openVersus(); };
 $('#vsBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#vsGo').onclick=()=>{
   const ct=COURTS[settings.vsCourt]||COURTS.hard;
-  startGame({mode:'versus',title:settings.singles?'Versus singles':'Versus',singles:!!settings.singles,venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len});
+  startGame({mode:'versus',title:settings.singles?'Versus singles':'Versus',singles:!!settings.singles,foe:settings.singles?settings.vsFoe:'',venue:ct,partner:settings.vsMate,pair:settings.vsPair,skill:0.74,len:settings.len});
 };
 $('#goCareer').onclick=()=>{ initAudio(); openPartner('career'); };
 $('#goTrain').onclick=()=>{ initAudio(); openTrain(); };
@@ -2249,10 +2272,15 @@ function syncSeg(){
   $('#cards').hidden = solo;
   $('#partnerH').innerHTML = solo ? 'Lee goes it <em>alone</em>' : "Pick Lee's <em>partner</em>";
   $('#vsMateRow').hidden = !!settings.singles;
-  $('#segP2').querySelectorAll('button').forEach((b,i)=>{ const pr=PAIRS[i]; if (pr) b.innerHTML = settings.singles ? pr.names[0] : `${pr.names[0]} &amp; ${pr.names[1]}`; });
+  if ($('#segP2').children.length) syncVersus();
+  $('#quickFoe').hidden = !(menuMode==='quick' && settings.singles);
+  for (const b of $('#segFoe').children) b.setAttribute('aria-pressed', String(b.dataset.v===settings.foe));
+  $('#segP2').querySelectorAll('button').forEach((b,i)=>{ const pr=!b.dataset.foe&&PAIRS[i]; if (pr) b.innerHTML = settings.singles ? pr.names[0] : `${pr.names[0]} &amp; ${pr.names[1]}`; });
   for (const b of document.querySelectorAll('#segDiff button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.diff));
   for (const b of document.querySelectorAll('.segLen button')) b.setAttribute('aria-pressed', String(+b.dataset.v===settings.len));
 }
+$('#segFoe').innerHTML = '<button data-v="">Club player</button>' + PARTNERS.map(p=>`<button data-v="${p.id}">${p.name}</button>`).join('');
+$('#segFoe').querySelectorAll('button').forEach(b=>b.onclick=()=>{ settings.foe=b.dataset.v; saveSettings(); syncSeg(); });
 document.querySelectorAll('#segDiff button').forEach(b=>b.onclick=()=>{ settings.diff=+b.dataset.v; saveSettings(); syncSeg(); });
 document.querySelectorAll('.segFmt button').forEach(b=>b.onclick=()=>{ settings.singles=!!+b.dataset.v; saveSettings(); syncSeg(); });
 document.querySelectorAll('.segLen button').forEach(b=>b.onclick=()=>{ settings.len=+b.dataset.v; saveSettings(); syncSeg(); });
@@ -2271,7 +2299,7 @@ function applyMode(){
   const fan=!!settings.fan, h=document.querySelector('.logo .hates');
   h.textContent = fan ? 'loves' : 'HATES'; h.classList.toggle('loves-t', fan);
   document.querySelector('.logo').setAttribute('aria-label', fan ? 'Lee loves tennis' : 'Lee HATES tennis');
-  $('#tagLine').textContent = fan ? 'Two-on-two tennis. Lee has seen the light, and its name is Carlos Alcaraz.' : 'Two-on-two tennis. Lee would rather be playing padel.';
+  $('#tagLine').textContent = fan ? 'Singles or doubles. Lee has seen the light, and its name is Carlos Alcaraz.' : 'Singles or doubles. Lee would rather be playing padel.';
   $('#helpMeter').innerHTML = fan ? '<b>Hype meter:</b> Lee\'s gushing fills it. When full, his next drive is a Vamos Shot. Keep gushing and his partner starts cringing, and plays worse. Winning points fills the partner bar: when it is full, your partner plays their special shot.' : '<b>Moan meter:</b> Lee\'s complaints fill it. When full, his next drive is a Rage Smash. Keep moaning and his partner gets fed up, and plays worse. Winning points fills the partner bar: when it is full, your partner plays their special shot.';
   $('#helpWalls').innerHTML = fan ? '<b>No walls.</b> Lee says that is what makes tennis beautiful.' : '<b>No walls.</b> Lee has noticed, and he has opinions.';
   document.title = fan ? 'Lee Loves Tennis' : 'Lee HATES tennis';
@@ -2295,7 +2323,7 @@ $('#partnerBack').onclick=()=>{ screen='title'; show('scrTitle'); };
 $('#partnerGo').onclick=()=>{
   if (menuMode==='tour') openIntro(0);
   else if (menuMode==='career') openCareer();
-  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',title:settings.singles?'Quick Singles':'Quick Match',singles:!!settings.singles,partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
+  else { const pi=[0,1,2][settings.diff]; startGame({mode:'quick',title:settings.singles?'Quick Singles':'Quick Match',singles:!!settings.singles,foe:settings.singles?settings.foe:'',partner:settings.partner,pair:pi,skill:[0.35,0.62,0.92][settings.diff],len:settings.len}); }
 };
 $('#introBack').onclick=toTitle;
 $('#resTitleBtn').onclick=toTitle;
