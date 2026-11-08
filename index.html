@@ -119,6 +119,28 @@ button:focus-visible{outline:3px solid var(--ball);outline-offset:3px}
 .vs .team{font-weight:800;font-size:clamp(14px,4.6cqh,28px);letter-spacing:.04em}
 .vs .team small{display:block;font-weight:600;font-size:.6em;color:var(--mute);letter-spacing:.14em;text-transform:uppercase}
 .vs .x{font-family:var(--f-display);color:var(--coral);font-size:clamp(14px,5cqh,30px)}
+.fo{display:flex;align-items:center;justify-content:center;gap:2cqw;width:min(92cqw,900px)}
+.foSide{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;opacity:0}
+.foSide canvas{width:min(100%,34cqh);height:auto;aspect-ratio:28/17}
+.foName{font-weight:800;font-size:clamp(14px,4.4cqh,26px);letter-spacing:.04em;text-align:center}
+.foName small{display:block;font-weight:600;font-size:.6em;color:var(--mute);letter-spacing:.14em;text-transform:uppercase}
+.foVs{font-family:var(--f-display);color:var(--coral);font-size:clamp(28px,12cqh,84px);opacity:0;text-shadow:0 0 24px rgba(255,77,109,.5)}
+.fo.go .foL{animation:foInL .55s cubic-bezier(.2,1.3,.4,1) forwards}
+.fo.go .foR{animation:foInR .55s cubic-bezier(.2,1.3,.4,1) .15s forwards}
+.fo.go .foVs{animation:foSlam .45s cubic-bezier(.3,1.6,.5,1) .6s forwards}
+@keyframes foInL{from{opacity:0;transform:translateX(-40cqw)}to{opacity:1;transform:none}}
+@keyframes foInR{from{opacity:0;transform:translateX(40cqw)}to{opacity:1;transform:none}}
+@keyframes foSlam{from{opacity:0;transform:scale(3) rotate(-12deg)}to{opacity:1;transform:rotate(-6deg)}}
+.foTalk{display:flex;flex-direction:column;gap:1cqh;width:min(88cqw,760px);min-height:26cqh;justify-content:flex-start;flex-shrink:0;gap:.6cqh}
+.bub{max-width:70%;padding:.7cqh 1.4cqw;border-radius:14px;font-size:clamp(11px,2.7cqh,16px);line-height:1.25;animation:bubIn .3s ease-out both;text-align:left}
+.bub b{display:block;font-size:.72em;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.2em}
+.bub.l{align-self:flex-start;background:rgba(255,255,255,.1);border-bottom-left-radius:4px}
+.bub.l b{color:var(--ball)}
+.bub.r{align-self:flex-end;background:rgba(255,77,109,.16);border-bottom-right-radius:4px}
+.bub.r b{color:var(--coral)}
+@keyframes bubIn{from{opacity:0;transform:translateY(10px) scale(.9)}to{opacity:1;transform:none}}
+@media (max-height:500px){#scrFaceoff .eyebrow{display:none}.foSide canvas{width:min(100%,28cqh)}.foTalk{min-height:22cqh}}
+@media (prefers-reduced-motion:reduce){.fo.go .foSide,.fo.go .foVs,.bub{animation-duration:.01s;animation-delay:0s}}
 .help{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2cqh 4cqw;text-align:left;max-width:86cqw}
 .help > div{min-width:0}
 .help h3{margin:0 0 .8cqh;font-size:clamp(12px,3.2cqh,19px);letter-spacing:.16em;text-transform:uppercase;color:var(--ball)}
@@ -254,6 +276,21 @@ kbd{font:700 .9em var(--f-ui);padding:.05em .4em;border-radius:5px;border:1px so
     <div id="onJoin" class="row"><input id="onInput" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Game code"><button class="btn primary" id="onJoinGo">Join</button></div>
     <p class="best" id="onStatus"></p>
     <button class="btn ghost" id="onBack">Cancel</button>
+  </section>
+
+  <section id="scrFaceoff" class="overlay solid" hidden>
+    <div class="eyebrow" id="foEyebrow">Match day</div>
+    <h2 id="foTitle">Quick Match</h2>
+    <div class="fo" id="fo">
+      <div class="foSide foL"><canvas id="foCvL" width="280" height="170"></canvas><div class="foName" id="foNameL"></div></div>
+      <div class="foVs" aria-hidden="true">VS</div>
+      <div class="foSide foR"><canvas id="foCvR" width="280" height="170"></canvas><div class="foName" id="foNameR"></div></div>
+    </div>
+    <div class="foTalk" id="foTalk" aria-live="polite"></div>
+    <div class="row">
+      <button class="btn ghost" id="foBack">Title</button>
+      <button class="btn primary" id="foGo">Play</button>
+    </div>
   </section>
 
   <section id="scrIntro" class="overlay solid" hidden>
@@ -1928,7 +1965,7 @@ $('#onInput').addEventListener('keydown', e=>{ if (e.key==='Enter') joinOnline()
 $('#onBack').onclick=()=>{ netClose(true); openVersus(); };
 
 /* ---------- screens ---------- */
-const SCREENS=['scrOnline','scrVersus','scrTitle','scrPartner','scrIntro','scrHelp','scrPause','scrResult','scrTrain','scrAch'];
+const SCREENS=['scrOnline','scrVersus','scrTitle','scrPartner','scrIntro','scrFaceoff','scrHelp','scrPause','scrResult','scrTrain','scrAch'];
 function show(id){ document.body.classList.toggle('menu', screen!=='game'); for (const s of SCREENS) $('#'+s).hidden = s!==id; $('#pauseBtn').hidden = !(screen==='game' && !paused); updateTouch(); const el=$('#'+id); if (el){ const b=el.querySelector('.btn.primary'); if (b) try{ b.focus({preventScroll:true}); }catch(e){} } }
 function newMatch(c){
   cfg=c;
@@ -1964,7 +2001,60 @@ function newMatch(c){
 function startDemo(){
   newMatch({demo:true,mode:'quick',title:'',partner:PARTNERS[Math.random()*3|0].id,pair:Math.random()*3|0,skill:0.75,len:2});
 }
+// Pre-match trash talk on the face-off screen. Per pair: open = first jab, back = comeback after Lee answers
+const TRASH = {
+  opp:[
+    {open:["Ready to get ground down, Lee?","We've been practising. Since 1987.","Hope you brought snacks. This'll take a while."],back:["Big words for a padel player.","We'll see who's moaning at the end.","Talk is cheap. Rallies are long."]},
+    {open:["Ooh, look who's turned up.","Mind your ankles, the ball stays low.","We've got a slice with your name on it."],back:["Cute. Now try returning a slice.","Save your breath, darling. You'll need it.","Aww, he's nervous."]},
+    {open:["You will not see my serve, Lee.","Viktor serves. Lee cries. Simple.","We do not lose."],back:["Brave. Also wrong.","Sven, he is talking again.","Your racket will not save you."]},
+  ],
+  lee:{hate:["I don't even like tennis. Let's get this over with.","On a padel court you'd be nothing.","Fine. But I'm not running for anything.","No walls? Your loss."],
+       fan:["Honestly? Honoured to share a court with you.","Vamos! Let's play beautiful tennis.","Carlos Alcaraz would love this matchup.","May the best tennis win. It's me."]},
+  mate:{ed:["Sorry in advance for whatever happens.","Sorry, but we're winning this."],ryan:["First serve's coming at your head. Kidding. Mostly.","Hope you like aces."],will:["The net's mine. Don't even look at it.","Lob me. I dare you."]},
+};
+let foTimers=[], foRaf=0;
+function faceoff(c){
+  screen='faceoff';
+  const pl=PARTNERS.find(p=>p.id===c.partner)||PARTNERS[0], pair=PAIRS[c.pair]||PAIRS[0], sg=!!c.singles, fan=!!settings.fan;
+  const us=[leeLook()].concat(sg?[]:[pl]), them=(sg?[0]:[0,1]).map(i=>oppLook(pair,i,c.skill));
+  $('#foEyebrow').textContent = c.mode==='versus' ? 'Versus · P1 vs P2' : (c.venue&&c.venue.venue) || 'Match day';
+  $('#foTitle').textContent = c.title;
+  $('#foNameL').innerHTML = sg ? 'Lee<small>Singles</small>' : `Lee &amp; ${firstName(pl.name)}<small>${pl.tag}</small>`;
+  $('#foNameR').innerHTML = sg ? `${pair.names[0]}<small>Singles</small>` : `${pair.names.join(' &amp; ')}<small>${pair.pair}</small>`;
+  // script: opponent jabs, Lee answers, partner chips in (doubles), opponent fires back
+  const T=TRASH.opp[c.pair]||TRASH.opp[0], O=OPP_LINES[c.pair]||OPP_LINES[0];
+  const lines=[['r',pair.names[0],pick(T.open)],['l','Lee',pick(TRASH.lee[fan?'fan':'hate'])]];
+  if (!sg) lines.push(['l',firstName(pl.name),pick(TRASH.mate[pl.id]||TRASH.mate.ed)]);
+  lines.push(['r',pair.names[sg?0:1],pick(fan?O.fan:T.back)]);
+  const talk=$('#foTalk'); talk.innerHTML='';
+  const fo=$('#fo'); fo.classList.remove('go'); void fo.offsetWidth; fo.classList.add('go');
+  foStop(); let speaker=null;
+  lines.forEach(([side,who,txt],i)=>foTimers.push(setTimeout(()=>{
+    const b=document.createElement('div'); b.className='bub '+side; b.innerHTML=`<b>${who}</b>`; b.appendChild(document.createTextNode(txt));
+    talk.appendChild(b); speaker=who; tone(side==='l'?520:380,0.06,'triangle',0.05);
+  }, 1300+i*1700)));
+  const cl=$('#foCvL').getContext('2d'), cr=$('#foCvR').getContext('2d'), t0=performance.now();
+  const draw=now=>{
+    if (screen!=='faceoff') return;
+    const t=(now-t0)/1000;
+    for (const [cx,team,away] of [[cl,us,false],[cr,them,false]]){
+      cx.clearRect(0,0,280,170);
+      team.forEach((L,i)=>{
+        const x = team.length===1 ? 140 : 85+110*i, talking = speaker===(L.name==='Lee'?'Lee':firstName(L.name));
+        const hop = talking ? Math.abs(Math.sin(t*9))*0.18 : Math.abs(Math.sin(t*2.2+i*1.3))*0.04;
+        drawFigure(cx,x,160,68,L,{away,run:t*6,moving:false,swing:talking?(Math.sin(t*5)*0.5+0.5)*0.6:0,prep:0,hop});
+      });
+    }
+    foRaf=requestAnimationFrame(draw);
+  };
+  foRaf=requestAnimationFrame(draw);
+  $('#foGo').onclick=()=>{ foStop(); startGame(Object.assign({},c,{_fo:1})); };
+  show('scrFaceoff');
+}
+function foStop(){ foTimers.forEach(clearTimeout); foTimers=[]; cancelAnimationFrame(foRaf); }
+$('#foBack').onclick=()=>{ foStop(); toTitle(); };
 function startGame(c){
+  if (!c.demo && !c.drill && !c.online && !c._fo){ faceoff(c); return; }
   initAudio();
   VIEW = NET.role==='guest' ? -1 : 1;
   newMatch(c); screen='game'; paused=false; show(null);
